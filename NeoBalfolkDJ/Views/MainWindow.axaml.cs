@@ -1,7 +1,9 @@
 using System.Collections.Generic;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Platform.Storage;
+using NeoBalfolkDJ.Models;
 using NeoBalfolkDJ.Services;
 using NeoBalfolkDJ.ViewModels;
 
@@ -25,12 +27,80 @@ public partial class MainWindow : Window
         // Track position and size changes for saving
         PositionChanged += OnPositionChanged;
         PropertyChanged += OnPropertyChanged;
+        
+        // Handle keyboard shortcuts
+        KeyDown += OnKeyDown;
+    }
+
+    private void OnKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel viewModel)
+            return;
+        
+        // Handle Ctrl+Z (Undo)
+        if (e.Key == Key.Z && e.KeyModifiers == KeyModifiers.Control)
+        {
+            // If synonym editor is visible, undo there
+            if (viewModel.IsSettingsVisible && viewModel.Settings.IsSynonymEditorVisible)
+            {
+                if (viewModel.Settings.SynonymEditor?.CanUndo == true)
+                {
+                    viewModel.Settings.SynonymEditor.UndoCommand.Execute(null);
+                    e.Handled = true;
+                }
+            }
+            // If dance tree is visible, undo there
+            else if (!viewModel.IsSettingsVisible && !viewModel.IsHelpVisible && viewModel.TrackList.IsTreeViewMode)
+            {
+                if (viewModel.TrackList.CanUndo)
+                {
+                    viewModel.TrackList.UndoCommand.Execute(null);
+                    e.Handled = true;
+                }
+            }
+        }
+        // Handle Ctrl+Shift+Z (Redo)
+        else if (e.Key == Key.Z && e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift))
+        {
+            // If synonym editor is visible, redo there
+            if (viewModel.IsSettingsVisible && viewModel.Settings.IsSynonymEditorVisible)
+            {
+                if (viewModel.Settings.SynonymEditor?.CanRedo == true)
+                {
+                    viewModel.Settings.SynonymEditor.RedoCommand.Execute(null);
+                    e.Handled = true;
+                }
+            }
+            // If dance tree is visible, redo there
+            else if (!viewModel.IsSettingsVisible && !viewModel.IsHelpVisible && viewModel.TrackList.IsTreeViewMode)
+            {
+                if (viewModel.TrackList.CanRedo)
+                {
+                    viewModel.TrackList.RedoCommand.Execute(null);
+                    e.Handled = true;
+                }
+            }
+        }
+        // Handle Delete key for queue items (not AutoQueuedTrack)
+        else if (e.Key == Key.Delete && e.KeyModifiers == KeyModifiers.None)
+        {
+            // Only when main view is visible (not settings, not help) and not in history mode
+            if (!viewModel.IsSettingsVisible && !viewModel.IsHelpVisible && !viewModel.Queue.IsHistoryMode)
+            {
+                // Check if there's a selected item that's not an AutoQueuedTrack
+                if (viewModel.Queue.SelectedItem != null && viewModel.Queue.SelectedItem is not AutoQueuedTrack)
+                {
+                    viewModel.Queue.RemoveSelectedItem();
+                    e.Handled = true;
+                }
+            }
+        }
     }
 
     private void OnPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
     {
         // Track size changes when in normal state
-        if (e.Property == BoundsProperty && WindowState == WindowState.Normal)
+        if (e.Property == BoundsProperty && WindowState == Avalonia.Controls.WindowState.Normal)
         {
             if (Width > 0 && Height > 0)
             {
@@ -41,7 +111,7 @@ public partial class MainWindow : Window
         // Track window state changes - capture position BEFORE going to maximized
         if (e.Property == WindowStateProperty)
         {
-            if (WindowState == WindowState.Normal)
+            if (WindowState == Avalonia.Controls.WindowState.Normal)
             {
                 // Returning to normal - capture new position/size
                 _lastNormalPosition = Position;
@@ -56,7 +126,7 @@ public partial class MainWindow : Window
     private void OnPositionChanged(object? sender, PixelPointEventArgs e)
     {
         // Only track position when in normal state
-        if (WindowState == WindowState.Normal)
+        if (WindowState == Avalonia.Controls.WindowState.Normal)
         {
             _lastNormalPosition = Position;
         }
@@ -104,7 +174,7 @@ public partial class MainWindow : Window
         {
             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
-                WindowState = WindowState.Maximized;
+                WindowState = Avalonia.Controls.WindowState.Maximized;
                 LoggingService.Debug("Restored window state: Maximized");
             }, Avalonia.Threading.DispatcherPriority.Background);
         }
@@ -115,7 +185,7 @@ public partial class MainWindow : Window
         var settings = SettingsService.Load();
         
         // Save the normal (non-maximized) position and size
-        if (WindowState == WindowState.Normal)
+        if (WindowState == Avalonia.Controls.WindowState.Normal)
         {
             settings.WindowX = Position.X;
             settings.WindowY = Position.Y;
@@ -133,7 +203,7 @@ public partial class MainWindow : Window
             LoggingService.Debug($"Saving maximized window state: lastPos=({_lastNormalPosition.X},{_lastNormalPosition.Y}), lastSize=({_lastNormalSize.Width}x{_lastNormalSize.Height})");
         }
         
-        settings.IsMaximized = WindowState == WindowState.Maximized;
+        settings.IsMaximized = WindowState == Avalonia.Controls.WindowState.Maximized;
         
         SettingsService.Save(settings);
         LoggingService.Debug($"Window state saved. IsMaximized={settings.IsMaximized}");

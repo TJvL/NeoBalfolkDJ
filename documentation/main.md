@@ -172,9 +172,9 @@ Edit dance synonyms to help categorize tracks with different naming conventions.
 
 | Shortcut | Action |
 |----------|--------|
-| Space | Play/Pause |
-| Ctrl+Z | Undo (in dance tree) |
-| Ctrl+Y | Redo (in dance tree) |
+| Ctrl+Z | Undo (in dance tree or synonym editor) |
+| Ctrl+Shift+Z | Redo (in dance tree or synonym editor) |
+| Delete | Remove selected queue item (except auto-queued tracks) |
 
 ---
 
