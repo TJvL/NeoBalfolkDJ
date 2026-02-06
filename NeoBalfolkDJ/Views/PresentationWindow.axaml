@@ -1,0 +1,105 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:NeoBalfolkDJ.ViewModels"
+        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
+        x:Class="NeoBalfolkDJ.Views.PresentationWindow"
+        x:DataType="vm:PresentationDisplayViewModel"
+        Title="Presentation Display"
+        Background="#1a1a1a"
+        WindowStartupLocation="CenterScreen">
+    
+    <Design.DataContext>
+        <vm:PresentationDisplayViewModel/>
+    </Design.DataContext>
+    
+    <Grid RowDefinitions="*,Auto,*">
+        <!-- Top half: Current track info -->
+        <Grid Grid.Row="0" VerticalAlignment="Center" IsVisible="{Binding HasCurrentItem}">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="16">
+                <!-- Normal dance name (not message mode) -->
+                <TextBlock Text="{Binding CurrentDance}"
+                           FontSize="72"
+                           FontWeight="Bold"
+                           HorizontalAlignment="Center"
+                           Foreground="White"
+                           IsVisible="{Binding !IsMessageMode}"/>
+                <!-- Message mode: auto-scaling text with Viewbox -->
+                <Viewbox MaxHeight="150" 
+                         Stretch="Uniform"
+                         StretchDirection="DownOnly"
+                         HorizontalAlignment="Center"
+                         IsVisible="{Binding IsMessageMode}"
+                         Margin="40,0">
+                    <TextBlock Text="{Binding CurrentDance}"
+                               FontSize="72"
+                               FontWeight="Bold"
+                               HorizontalAlignment="Center"
+                               Foreground="White"
+                               TextWrapping="NoWrap"/>
+                </Viewbox>
+                <TextBlock Text="{Binding CurrentArtist}"
+                           FontSize="48"
+                           HorizontalAlignment="Center"
+                           Foreground="#cccccc"/>
+                <TextBlock Text="{Binding CurrentTitle}"
+                           FontSize="36"
+                           HorizontalAlignment="Center"
+                           Foreground="#999999"/>
+            </StackPanel>
+        </Grid>
+        
+        <!-- Placeholder when no current track -->
+        <TextBlock Grid.Row="0"
+                   Text="No track playing"
+                   FontSize="48"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center"
+                   Foreground="#666666"
+                   IsVisible="{Binding !HasCurrentItem}"/>
+        
+        <!-- Progress bar in the middle -->
+        <ProgressBar Grid.Row="1"
+                     Minimum="0"
+                     Maximum="{Binding Duration}"
+                     Value="{Binding Progress}"
+                     Height="20"
+                     Margin="40,0"
+                     Background="#333333"
+                     Foreground="#4CAF50"/>
+        
+        <!-- Bottom half: Next track info -->
+        <Grid Grid.Row="2" VerticalAlignment="Center" IsVisible="{Binding HasNextItem}">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
+                <TextBlock Text="Next:"
+                           FontSize="24"
+                           HorizontalAlignment="Center"
+                           Foreground="#666666"
+                           Margin="0,0,0,8"/>
+                <TextBlock Text="{Binding NextDance}"
+                           FontSize="48"
+                           FontWeight="Bold"
+                           HorizontalAlignment="Center"
+                           Foreground="#aaaaaa"/>
+                <TextBlock Text="{Binding NextArtist}"
+                           FontSize="32"
+                           HorizontalAlignment="Center"
+                           Foreground="#888888"/>
+                <TextBlock Text="{Binding NextTitle}"
+                           FontSize="24"
+                           HorizontalAlignment="Center"
+                           Foreground="#666666"/>
+            </StackPanel>
+        </Grid>
+        
+        <!-- Placeholder when no next item -->
+        <TextBlock Grid.Row="2"
+                   Text="Queue empty"
+                   FontSize="32"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center"
+                   Foreground="#444444"
+                   IsVisible="{Binding !HasNextItem}"/>
+    </Grid>
+</Window>

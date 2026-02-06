@@ -1,0 +1,230 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:NeoBalfolkDJ.ViewModels"
+             xmlns:models="using:NeoBalfolkDJ.Models"
+             mc:Ignorable="d" d:DesignWidth="400" d:DesignHeight="300"
+             x:Class="NeoBalfolkDJ.Views.QueueView"
+             x:DataType="vm:QueueViewModel">
+    
+    <Design.DataContext>
+        <vm:QueueViewModel/>
+    </Design.DataContext>
+    
+    <Border BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}" 
+            BorderThickness="1" 
+            CornerRadius="8"
+            Padding="8"
+            ClipToBounds="True">
+        <Grid RowDefinitions="*,Auto" ClipToBounds="True">
+            <!-- Queue ListBox (visible when not in history mode) -->
+            <ListBox Grid.Row="0"
+                     ItemsSource="{Binding QueuedItems}"
+                     SelectedItem="{Binding SelectedItem}"
+                     SelectionMode="Single"
+                     FontSize="10"
+                     ClipToBounds="True"
+                     IsVisible="{Binding !IsHistoryMode}">
+                <ListBox.DataTemplates>
+                    <!-- Track template -->
+                    <DataTemplate DataType="models:Track">
+                        <Grid ColumnDefinitions="*,*,2*,60">
+                            <TextBlock Grid.Column="0" Text="{Binding Dance}" 
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,8,0"/>
+                            <TextBlock Grid.Column="1" Text="{Binding Artist}" 
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,8,0"/>
+                            <TextBlock Grid.Column="2" Text="{Binding Title}" 
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,8,0"/>
+                            <TextBlock Grid.Column="3" Text="{Binding LengthFormatted}" 
+                                       VerticalAlignment="Center"
+                                       HorizontalAlignment="Right"/>
+                        </Grid>
+                    </DataTemplate>
+                    <!-- Stop marker template -->
+                    <DataTemplate DataType="models:StopMarker">
+                        <Border Background="#18FF8C00" CornerRadius="2" Padding="4,2" Margin="-4,-2">
+                            <Grid ColumnDefinitions="Auto,*">
+                                <TextBlock Grid.Column="0" Text="■" 
+                                           Foreground="#FF8C00"
+                                           FontWeight="Bold"
+                                           VerticalAlignment="Center"
+                                           Margin="0,0,8,0"/>
+                                <TextBlock Grid.Column="1" Text="STOP — Playback will pause here" 
+                                           VerticalAlignment="Center"
+                                           FontStyle="Italic"
+                                           Opacity="0.8"/>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                    <!-- Delay marker template -->
+                    <DataTemplate DataType="models:DelayMarker">
+                        <Border Background="#184169E1" CornerRadius="2" Padding="4,2" Margin="-4,-2">
+                            <Grid ColumnDefinitions="Auto,*,Auto">
+                                <TextBlock Grid.Column="0" Text="⏱" 
+                                           Foreground="#4169E1"
+                                           FontWeight="Bold"
+                                           VerticalAlignment="Center"
+                                           Margin="0,0,8,0"/>
+                                <TextBlock Grid.Column="1" Text="DELAY — Playback will pause temporarily" 
+                                           VerticalAlignment="Center"
+                                           FontStyle="Italic"
+                                           Opacity="0.8"/>
+                                <TextBlock Grid.Column="2" Text="{Binding DurationFormatted}" 
+                                           VerticalAlignment="Center"
+                                           HorizontalAlignment="Right"
+                                           Margin="8,0,0,0"/>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                    <!-- Message marker template -->
+                    <DataTemplate DataType="models:MessageMarker">
+                        <Border Background="#18800080" CornerRadius="2" Padding="4,2" Margin="-4,-2">
+                            <Grid ColumnDefinitions="Auto,Auto,*,Auto">
+                                <TextBlock Grid.Column="0" Text="✉" 
+                                           Foreground="#800080"
+                                           FontWeight="Bold"
+                                           VerticalAlignment="Center"
+                                           Margin="0,0,8,0"/>
+                                <TextBlock Grid.Column="1" Text="MESSAGE" 
+                                           Foreground="#800080"
+                                           FontWeight="Bold"
+                                           VerticalAlignment="Center"
+                                           Margin="0,0,8,0"/>
+                                <TextBlock Grid.Column="2" Text="{Binding Message}" 
+                                           VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis"
+                                           Opacity="0.8"/>
+                                <TextBlock Grid.Column="3" Text="{Binding DurationFormatted}" 
+                                           VerticalAlignment="Center"
+                                           HorizontalAlignment="Right"
+                                           Foreground="#800080"
+                                           Margin="8,0,0,0"/>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                    <!-- Auto-queued track template (faded appearance) -->
+                    <DataTemplate DataType="models:AutoQueuedTrack">
+                        <Border Background="#10808080" CornerRadius="2" Padding="4,2" Margin="-4,-2">
+                            <Grid ColumnDefinitions="Auto,*,*,2*,Auto,Auto,50">
+                                <TextBlock Grid.Column="0" Text="⟳" 
+                                           Foreground="#808080"
+                                           VerticalAlignment="Center"
+                                           Margin="0,0,8,0"/>
+                                <TextBlock Grid.Column="1" Text="{Binding Dance}" 
+                                           VerticalAlignment="Center"
+                                           Opacity="0.6"
+                                           FontStyle="Italic"
+                                           Margin="0,0,8,0"/>
+                                <TextBlock Grid.Column="2" Text="{Binding Artist}" 
+                                           VerticalAlignment="Center"
+                                           Opacity="0.6"
+                                           FontStyle="Italic"
+                                           Margin="0,0,8,0"/>
+                                <TextBlock Grid.Column="3" Text="{Binding Title}" 
+                                           VerticalAlignment="Center"
+                                           Opacity="0.6"
+                                           FontStyle="Italic"
+                                           Margin="0,0,8,0"/>
+                                <!-- Refresh button - pick different random track -->
+                                <Button Grid.Column="4" 
+                                        Click="OnRefreshAutoQueuedClick"
+                                        ToolTip.Tip="Pick different random track"
+                                        Padding="2"
+                                        Margin="0,0,4,0"
+                                        Background="Transparent"
+                                        BorderThickness="0">
+                                    <PathIcon Data="M12,6V9L16,5L12,1V4A8,8 0 0,0 4,12C4,13.57 4.46,15.03 5.24,16.26L6.7,14.8C6.25,13.97 6,13 6,12A6,6 0 0,1 12,6M18.76,7.74L17.3,9.2C17.74,10.04 18,11 18,12A6,6 0 0,1 12,18V15L8,19L12,23V20A8,8 0 0,0 20,12C20,10.43 19.54,8.97 18.76,7.74Z"
+                                              Width="12" Height="12"
+                                              Foreground="#808080"/>
+                                </Button>
+                                <!-- Pin button - keep this track -->
+                                <Button Grid.Column="5" 
+                                        Click="OnPinAutoQueuedClick"
+                                        ToolTip.Tip="Keep this track"
+                                        Padding="2"
+                                        Margin="0,0,8,0"
+                                        Background="Transparent"
+                                        BorderThickness="0">
+                                    <PathIcon Data="M16,12V4H17V2H7V4H8V12L6,14V16H11.2V22H12.8V16H18V14L16,12Z"
+                                              Width="12" Height="12"
+                                              Foreground="#808080"/>
+                                </Button>
+                                <TextBlock Grid.Column="6" Text="{Binding LengthFormatted}" 
+                                           VerticalAlignment="Center"
+                                           Opacity="0.6"
+                                           FontStyle="Italic"
+                                           HorizontalAlignment="Right"/>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ListBox.DataTemplates>
+            </ListBox>
+            
+            <!-- History ListBox (visible when in history mode) -->
+            <ListBox Grid.Row="0"
+                     x:Name="HistoryListBox"
+                     ItemsSource="{Binding HistoryItems}"
+                     SelectionMode="Toggle"
+                     FontSize="10"
+                     ClipToBounds="True"
+                     IsVisible="{Binding IsHistoryMode}">
+                <ListBox.Styles>
+                    <Style Selector="ListBox#HistoryListBox > ListBoxItem">
+                        <Setter Property="IsHitTestVisible" Value="False"/>
+                    </Style>
+                </ListBox.Styles>
+                <ListBox.DataTemplates>
+                    <DataTemplate DataType="models:Track">
+                        <Grid ColumnDefinitions="*,*,2*,60">
+                            <TextBlock Grid.Column="0" Text="{Binding Dance}" 
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,8,0"/>
+                            <TextBlock Grid.Column="1" Text="{Binding Artist}" 
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,8,0"/>
+                            <TextBlock Grid.Column="2" Text="{Binding Title}" 
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,8,0"/>
+                            <TextBlock Grid.Column="3" Text="{Binding LengthFormatted}" 
+                                       VerticalAlignment="Center"
+                                       HorizontalAlignment="Right"/>
+                        </Grid>
+                    </DataTemplate>
+                </ListBox.DataTemplates>
+            </ListBox>
+            
+            <!-- Bottom row with toggle button and status text -->
+            <Grid Grid.Row="1" ColumnDefinitions="Auto,*" Margin="0,8,0,0">
+                <!-- Toggle history mode button -->
+                <Button Grid.Column="0"
+                        Command="{Binding ToggleHistoryModeCommand}"
+                        ToolTip.Tip="Toggle history view"
+                        Padding="4"
+                        Background="Transparent"
+                        BorderThickness="0">
+                    <!-- Hourglass icon when showing queue, list icon when showing history -->
+                    <Panel>
+                        <PathIcon Data="M6,2V8H6V8L10,12L6,16V16H6V22H18V16H18V16L14,12L18,8V8H18V2H6M16,16.5V20H8V16.5L12,12.5L16,16.5M12,11.5L8,7.5V4H16V7.5L12,11.5Z"
+                                  Width="14" Height="14"
+                                  IsVisible="{Binding !IsHistoryMode}"/>
+                        <PathIcon Data="M3,4H21V6H3V4M3,11H21V13H3V11M3,18H21V20H3V18Z"
+                                  Width="14" Height="14"
+                                  IsVisible="{Binding IsHistoryMode}"/>
+                    </Panel>
+                </Button>
+                
+                <!-- Status text -->
+                <TextBlock Grid.Column="1"
+                           Text="{Binding StatusText}"
+                           HorizontalAlignment="Right"
+                           VerticalAlignment="Center"
+                           FontSize="11"
+                           Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"/>
+            </Grid>
+        </Grid>
+    </Border>
+</UserControl>

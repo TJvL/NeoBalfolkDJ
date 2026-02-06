@@ -1,0 +1,38 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="400" d:DesignHeight="150"
+        x:Class="NeoBalfolkDJ.Views.ConfirmDeleteDialog"
+        Title="Confirm Delete"
+        Width="400"
+        Height="150"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False"
+        ShowInTaskbar="False">
+    
+    <Grid Margin="20" RowDefinitions="*,Auto">
+        <!-- Message -->
+        <TextBlock Grid.Row="0" 
+                   x:Name="MessageText"
+                   Text="Are you sure you want to delete this item?" 
+                   TextWrapping="Wrap"
+                   VerticalAlignment="Center"/>
+        
+        <!-- Buttons -->
+        <StackPanel Grid.Row="1" 
+                    Orientation="Horizontal" 
+                    HorizontalAlignment="Right"
+                    Spacing="8">
+            <Button x:Name="NoButton" 
+                    Content="No" 
+                    Width="80"
+                    Click="OnNoClick"/>
+            <Button x:Name="YesButton" 
+                    Content="Yes" 
+                    Width="80"
+                    Classes="accent"
+                    Click="OnYesClick"/>
+        </StackPanel>
+    </Grid>
+</Window>

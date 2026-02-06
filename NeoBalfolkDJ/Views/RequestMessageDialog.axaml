@@ -1,0 +1,68 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="450" d:DesignHeight="220"
+        x:Class="NeoBalfolkDJ.Views.RequestMessageDialog"
+        Title="Request Message"
+        Width="450"
+        Height="220"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False"
+        ShowInTaskbar="False">
+    
+    <Grid Margin="20" RowDefinitions="Auto,Auto,Auto,*,Auto">
+        <!-- Message input -->
+        <StackPanel Grid.Row="0" Spacing="4">
+            <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Grid.Column="0" Text="Message"/>
+                <TextBlock Grid.Column="1" x:Name="CharacterCountText" Text="0/60" Opacity="0.6"/>
+            </Grid>
+            <TextBox x:Name="MessageTextBox" 
+                     MaxLength="60"
+                     Watermark="Enter message to display..."
+                     TextChanged="OnMessageTextChanged"/>
+        </StackPanel>
+        
+        <!-- Use delay checkbox -->
+        <CheckBox Grid.Row="1" 
+                  x:Name="UseDelayCheckBox"
+                  Content="Use timed delay (otherwise stops until manual resume)"
+                  Margin="0,16,0,0"
+                  IsCheckedChanged="OnUseDelayChanged"/>
+        
+        <!-- Delay duration -->
+        <StackPanel Grid.Row="2" 
+                    x:Name="DelayPanel"
+                    Spacing="4" 
+                    Margin="0,12,0,0"
+                    IsVisible="False">
+            <TextBlock Text="Delay duration (seconds)"/>
+            <NumericUpDown x:Name="DelaySecondsUpDown"
+                           Value="30"
+                           Minimum="1"
+                           Maximum="300"
+                           Increment="5"
+                           Width="120"
+                           HorizontalAlignment="Left"/>
+        </StackPanel>
+        
+        <!-- Buttons -->
+        <StackPanel Grid.Row="4" 
+                    Orientation="Horizontal" 
+                    HorizontalAlignment="Right"
+                    Spacing="8">
+            <Button x:Name="CancelButton" 
+                    Content="Cancel" 
+                    Width="80"
+                    Click="OnCancelClick"/>
+            <Button x:Name="OkButton" 
+                    Content="OK" 
+                    Width="80"
+                    Classes="accent"
+                    Click="OnOkClick"
+                    IsEnabled="False"/>
+        </StackPanel>
+    </Grid>
+</Window>
+

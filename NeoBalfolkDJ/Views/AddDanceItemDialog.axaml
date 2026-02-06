@@ -1,0 +1,67 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="350" d:DesignHeight="200"
+        x:Class="NeoBalfolkDJ.Views.AddDanceItemDialog"
+        Title="Add Item"
+        Width="350"
+        Height="200"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False"
+        ShowInTaskbar="False">
+    
+    <Grid Margin="20" RowDefinitions="Auto,Auto,Auto,*,Auto">
+        <!-- Title -->
+        <TextBlock Grid.Row="0" 
+                   x:Name="TitleText"
+                   Text="Add Category" 
+                   FontSize="18" 
+                   FontWeight="SemiBold"
+                   Margin="0,0,0,16"/>
+        
+        <!-- Name Input -->
+        <Grid Grid.Row="1" ColumnDefinitions="80,*" Margin="0,0,0,12">
+            <TextBlock Grid.Column="0" 
+                       Text="Name:" 
+                       VerticalAlignment="Center"/>
+            <TextBox Grid.Column="1" 
+                     x:Name="NameTextBox"
+                     Watermark="Enter name..."
+                     AcceptsReturn="False"/>
+        </Grid>
+        
+        <!-- Weight Input -->
+        <Grid Grid.Row="2" ColumnDefinitions="80,*" Margin="0,0,0,12">
+            <TextBlock Grid.Column="0" 
+                       Text="Weight:" 
+                       VerticalAlignment="Center"/>
+            <NumericUpDown Grid.Column="1" 
+                           x:Name="WeightInput"
+                           Minimum="0"
+                           Maximum="9999"
+                           Value="1"
+                           Increment="1"
+                           FormatString="0"/>
+        </Grid>
+        
+        <!-- Spacer -->
+        <Panel Grid.Row="3"/>
+        
+        <!-- Buttons -->
+        <StackPanel Grid.Row="4" 
+                    Orientation="Horizontal" 
+                    HorizontalAlignment="Right"
+                    Spacing="8">
+            <Button x:Name="CancelButton" 
+                    Content="Cancel" 
+                    Width="80"
+                    Click="OnCancelClick"/>
+            <Button x:Name="OkButton" 
+                    Content="OK" 
+                    Width="80"
+                    Classes="accent"
+                    Click="OnOkClick"/>
+        </StackPanel>
+    </Grid>
+</Window>

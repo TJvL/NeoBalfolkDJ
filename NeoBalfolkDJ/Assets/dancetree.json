@@ -1,0 +1,91 @@
+[
+  {
+    "name" : "Koppeldansen",
+    "recurring" : true,
+    "weight" : 4,
+    "dances" : [
+      {"name" : "mazurka", "weight" : 8},
+      {"name" : "scottish", "weight" : 8},
+      {"name" : "polska", "weight" : 2},
+      {"name" : "polka", "weight" : 2},
+      {"name" : "scottish impaire", "weight" : 1},
+      {"name" : "mazurka in 11", "weight" : 1}],
+    "children" : [
+      {
+        "name" : "Walsen",
+        "weight" : 3,
+        "dances" : [
+          {"name" : "wals in 3", "weight" : 8},
+          {"name" : "wals in 5", "weight" : 3},
+          {"name" : "wals in 8", "weight" : 2},
+          {"name" : "wals in 11", "weight" : 1},
+          {"name" : "wals onregelmatig", "weight" : 1}]
+      }]
+  },
+  {
+    "name" : "Mixers",
+    "weight" : 2,
+    "dances" : [
+      {"name" : "cercle", "weight" : 1},
+      {"name" : "gigue", "weight" : 1},
+      {"name" : "grabbelton", "weight" : 0}]
+  },
+  {
+    "name" : "Solodansen",
+    "weight" : 2,
+    "dances" : [
+      {"name" : "madison", "weight" : 1},
+      {"name" : "Pas d'été", "weight" : 1},
+      {"name" : "Sèt Sauts", "weight" : 1}]
+  },
+  {
+    "name" : "Bretons",
+    "weight" : 3,
+    "dances" : [
+      {"name" : "andro", "weight" : 5},
+      {"name" : "andro retourne", "weight" : 0},
+      {"name" : "hanterdro", "weight" : 5},
+      {"name" : "tricot", "weight" : 1},
+      {"name" : "gavotte de grenoble", "weight" : 5},
+      {"name" : "gavotte de l'aven", "weight" : 1},
+      {"name" : "rond de saint-vincent", "weight" : 2},
+      {"name" : "gavotte", "weight" : 1},
+      {"name" : "kost ar c'hoad", "weight" : 5},
+      {"name" : "laridé", "weight" : 1},
+      {"name" : "cochinchine", "weight" : 0},
+      {"name" : "ridée", "weight" : 1},
+      {"name" : "plinn", "weight" : 2},
+      {"name" : "suite plinn", "weight" : 1}]
+  },
+  {
+    "name" : "Bourrées",
+    "weight" : 3,
+    "dances" : [
+      {"name" : "bourrée in 2", "weight" : 5},
+      {"name" : "bourrée in 3", "weight" : 5}]
+  },
+  {
+    "name" : "Gascogne",
+    "weight" : 3,
+    "dances" : [
+      {"name" : "congo", "weight" : 0},
+      {"name" : "rondeau en couple", "weight" : 5},
+      {"name" : "rondo", "weight" : 0},
+      {"name" : "ronde du quercy", "weight" : 2}]
+  },
+  {
+    "name" : "Poitou",
+    "weight" : 1,
+    "dances" : [
+      {"name" : "avant-deux", "weight" : 0},
+      {"name" : "avant deux de travers", "weight" : 0},
+      {"name" : "avant-deux à coutant", "weight" : 0},
+      {"name" : "branle de noirmoutier", "weight" : 1},
+      {"name" : "ronde de chantecorps", "weight" : 0},
+      {"name" : "maraîchine", "weight" : 0},
+      {"name" : "polaïe", "weight" : 0},
+      {"name" : "poraïe", "weight" : 1},
+      {"name" : "bal limousine", "weight" : 0},
+      {"name" : "mardi gras", "weight" : 0}]
+  }
+]

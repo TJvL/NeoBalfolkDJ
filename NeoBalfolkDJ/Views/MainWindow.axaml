@@ -1,0 +1,81 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:NeoBalfolkDJ.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:views="using:NeoBalfolkDJ.Views"
+        mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="600"
+        x:Class="NeoBalfolkDJ.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Icon="/Assets/avalonia-logo.ico"
+        Title="NeoBalfolkDJ">
+
+    <Design.DataContext>
+        <vm:MainWindowViewModel/>
+    </Design.DataContext>
+
+    <Window.DataTemplates>
+        <DataTemplate DataType="vm:TrackListViewModel">
+            <views:TrackListView/>
+        </DataTemplate>
+        <DataTemplate DataType="vm:SettingsViewModel">
+            <views:SettingsView/>
+        </DataTemplate>
+        <DataTemplate DataType="vm:PlaybackViewModel">
+            <views:PlaybackView/>
+        </DataTemplate>
+        <DataTemplate DataType="vm:QueueViewModel">
+            <views:QueueView/>
+        </DataTemplate>
+        <DataTemplate DataType="vm:NotificationViewModel">
+            <views:NotificationView/>
+        </DataTemplate>
+        <DataTemplate DataType="vm:ToolbarViewModel">
+            <views:ToolbarView/>
+        </DataTemplate>
+        <DataTemplate DataType="vm:HelpViewModel">
+            <views:HelpView/>
+        </DataTemplate>
+    </Window.DataTemplates>
+
+    <Panel>
+        <Grid Margin="16">
+            <!-- Main layout (hidden when settings or help visible) -->
+            <Grid ColumnDefinitions="4*,16,6*">
+                <Grid.IsVisible>
+                    <MultiBinding Converter="{x:Static BoolConverters.And}">
+                        <Binding Path="!IsSettingsVisible"/>
+                        <Binding Path="!IsHelpVisible"/>
+                    </MultiBinding>
+                </Grid.IsVisible>
+                <!-- Left side: Playback, Toolbar, and Queue using DockPanel -->
+                <DockPanel Grid.Column="0">
+                    <!-- Playback View at top -->
+                    <ContentControl DockPanel.Dock="Top" Content="{Binding Playback}" Margin="0,0,0,8"/>
+                    
+                    <!-- Toolbar View between playback and queue -->
+                    <ContentControl DockPanel.Dock="Top" Content="{Binding Toolbar}" Margin="0,0,0,8"/>
+                    
+                    <!-- Queue View fills remaining space -->
+                    <ContentControl Content="{Binding Queue}"/>
+                </DockPanel>
+
+                <!-- Track List on the right (full height) -->
+                <ContentControl Grid.Column="2" Content="{Binding TrackList}"/>
+            </Grid>
+
+            <!-- Settings view (full screen when visible) -->
+            <ContentControl Content="{Binding Settings}" IsVisible="{Binding IsSettingsVisible}"/>
+            
+            <!-- Help view (full screen when visible) -->
+            <ContentControl Content="{Binding Help}" IsVisible="{Binding IsHelpVisible}"/>
+        </Grid>
+
+        <!-- Notification bar overlapping in the middle -->
+        <ContentControl Content="{Binding Notification}"
+                        VerticalAlignment="Center"
+                        HorizontalAlignment="Center"
+                        IsVisible="{Binding Notification.IsVisible}"/>
+    </Panel>
+
+</Window>

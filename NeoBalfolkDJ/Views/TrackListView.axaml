@@ -1,0 +1,251 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:NeoBalfolkDJ.ViewModels"
+             xmlns:models="using:NeoBalfolkDJ.Models"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="NeoBalfolkDJ.Views.TrackListView"
+             x:DataType="vm:TrackListViewModel">
+    
+    <Design.DataContext>
+        <vm:TrackListViewModel/>
+    </Design.DataContext>
+    
+    <Grid RowDefinitions="Auto,*">
+        <!-- Toolbar with Toggle, Undo, Redo, Import, Export, and Search -->
+        <Grid Grid.Row="0" ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,*,Auto" Margin="0,0,0,8">
+            <!-- Toggle View Mode Button (shows tree view) -->
+            <Button Grid.Column="0"
+                    Command="{Binding ToggleViewModeCommand}"
+                    ToolTip.Tip="Switch to dance tree view"
+                    Padding="8,6"
+                    IsVisible="{Binding !IsTreeViewMode}">
+                <!-- Tree/hierarchy icon -->
+                <PathIcon Data="M3,3H9V7H3V3M15,10H21V14H15V10M15,17H21V21H15V17M13,13H7V18H13V20H7L5,20V9H7V11H13V13Z"
+                          Width="16" Height="16"/>
+            </Button>
+
+            <!-- Toggle View Mode Button (shows track list) -->
+            <Button Grid.Column="0"
+                    Command="{Binding ToggleViewModeCommand}"
+                    ToolTip.Tip="Switch to track list view"
+                    Padding="8,6"
+                    IsVisible="{Binding IsTreeViewMode}">
+                <!-- List icon -->
+                <PathIcon Data="M3,4H21V8H3V4M3,10H21V14H3V10M3,16H21V20H3V16Z"
+                          Width="16" Height="16"/>
+            </Button>
+            
+            <!-- Divider between toggle and undo/redo (only visible in tree view mode) -->
+            <Rectangle Grid.Column="1" 
+                       Width="1" 
+                       Fill="{DynamicResource SystemControlForegroundBaseMediumLowBrush}" 
+                       Margin="8,4"
+                       IsVisible="{Binding IsTreeViewMode}"/>
+            
+            <!-- Divider between toggle and search (only visible in list view mode) -->
+            <Rectangle Grid.Column="1" 
+                       Width="1" 
+                       Fill="{DynamicResource SystemControlForegroundBaseMediumLowBrush}" 
+                       Margin="8,4"
+                       IsVisible="{Binding !IsTreeViewMode}"/>
+            
+            <!-- Undo Button (only visible in tree view mode) -->
+            <Button Grid.Column="2"
+                    Command="{Binding UndoCommand}"
+                    Padding="8,6"
+                    ToolTip.Tip="Undo"
+                    IsVisible="{Binding IsTreeViewMode}">
+                <PathIcon Data="M12.5,8C9.85,8 7.45,9 5.6,10.6L2,7V16H11L7.38,12.38C8.77,11.22 10.54,10.5 12.5,10.5C16.04,10.5 19.05,12.81 20.1,16L22.47,15.22C21.08,11.03 17.15,8 12.5,8Z"
+                          Width="16" Height="16"/>
+            </Button>
+            
+            <!-- Redo Button (only visible in tree view mode) -->
+            <Button Grid.Column="3"
+                    Command="{Binding RedoCommand}"
+                    Margin="4,0,0,0"
+                    Padding="8,6"
+                    ToolTip.Tip="Redo"
+                    IsVisible="{Binding IsTreeViewMode}">
+                <PathIcon Data="M18.4,10.6C16.55,9 14.15,8 11.5,8C6.85,8 2.92,11.03 1.54,15.22L3.9,16C4.95,12.81 7.95,10.5 11.5,10.5C13.45,10.5 15.23,11.22 16.62,12.38L13,16H22V7L18.4,10.6Z"
+                          Width="16" Height="16"/>
+            </Button>
+            
+            <!-- Divider between undo/redo and import/export (only visible in tree view mode) -->
+            <Rectangle Grid.Column="4" 
+                       Width="1" 
+                       Fill="{DynamicResource SystemControlForegroundBaseMediumLowBrush}" 
+                       Margin="8,4"
+                       IsVisible="{Binding IsTreeViewMode}"/>
+            
+            <!-- Import Dance Tree Button (only visible in tree view mode) -->
+            <Button Grid.Column="5"
+                    Command="{Binding RequestImportDanceTreeCommand}"
+                    Padding="8,6"
+                    ToolTip.Tip="Import dance tree"
+                    IsVisible="{Binding IsTreeViewMode}">
+                <PathIcon Data="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M13.5,16V19H10.5V16H8L12,12L16,16H13.5M13,9V3.5L18.5,9H13Z"
+                          Width="16" Height="16"/>
+            </Button>
+            
+            <!-- Export Dance Tree Button (only visible in tree view mode) -->
+            <Button Grid.Column="6"
+                    Command="{Binding RequestExportDanceTreeCommand}"
+                    Margin="4,0,0,0"
+                    Padding="8,6"
+                    ToolTip.Tip="Export dance tree"
+                    IsVisible="{Binding IsTreeViewMode}">
+                <PathIcon Data="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M13.5,16V13H10.5V16H8L12,20L16,16H13.5M13,9V3.5L18.5,9H13Z"
+                          Width="16" Height="16"/>
+            </Button>
+            
+            <!-- Search Box (only visible in list view mode) -->
+            <TextBox Grid.Column="7"
+                     Text="{Binding SearchText}"
+                     Watermark="Search tracks..."
+                     IsVisible="{Binding !IsTreeViewMode}"/>
+            
+            <!-- Clear Search Button (only visible in list view mode when search has text) -->
+            <Button Grid.Column="8"
+                    Command="{Binding ClearSearchCommand}"
+                    Margin="4,0,0,0"
+                    Padding="8,6"
+                    ToolTip.Tip="Clear search">
+                <Button.IsVisible>
+                    <MultiBinding Converter="{x:Static BoolConverters.And}">
+                        <Binding Path="!IsTreeViewMode"/>
+                        <Binding Path="SearchText" Converter="{x:Static StringConverters.IsNotNullOrEmpty}"/>
+                    </MultiBinding>
+                </Button.IsVisible>
+                <PathIcon Data="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"
+                          Width="12" Height="12"/>
+            </Button>
+        </Grid>
+        
+        <!-- Track List DataGrid (visible in list mode) -->
+        <DataGrid Grid.Row="1"
+                  x:Name="TracksDataGrid"
+                  ItemsSource="{Binding Tracks}"
+                  AutoGenerateColumns="False"
+                  IsReadOnly="True"
+                  CanUserReorderColumns="True"
+                  CanUserResizeColumns="True"
+                  CanUserSortColumns="True"
+                  GridLinesVisibility="None"
+                  SelectionMode="Single"
+                  Sorting="DataGrid_Sorting"
+                  DoubleTapped="DataGrid_DoubleTapped"
+                  IsVisible="{Binding !IsTreeViewMode}">
+            <DataGrid.Styles>
+                <Style Selector="DataGridCell:focus /template/ Grid#FocusVisual">
+                    <Setter Property="IsVisible" Value="False"/>
+                </Style>
+                <Style Selector="DataGridCell:current /template/ Grid#FocusVisual">
+                    <Setter Property="IsVisible" Value="False"/>
+                </Style>
+                <Style Selector="DataGridCell">
+                    <Setter Property="BorderThickness" Value="0"/>
+                </Style>
+                <Style Selector="DataGridColumnHeader">
+                    <Setter Property="BorderThickness" Value="0"/>
+                    <Setter Property="SeparatorBrush" Value="Transparent"/>
+                    <Setter Property="AreSeparatorsVisible" Value="False"/>
+                </Style>
+                <Style Selector="DataGridRow">
+                    <Setter Property="BorderThickness" Value="0"/>
+                </Style>
+            </DataGrid.Styles>
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Dance" 
+                                    Binding="{Binding Dance}" 
+                                    Width="*"
+                                    x:DataType="models:Track"/>
+                <DataGridTextColumn Header="Artist" 
+                                    Binding="{Binding Artist}" 
+                                    Width="*"
+                                    x:DataType="models:Track"/>
+                <DataGridTextColumn Header="Title" 
+                                    Binding="{Binding Title}" 
+                                    Width="2*"
+                                    x:DataType="models:Track"/>
+                <DataGridTextColumn Header="Length" 
+                                    Binding="{Binding LengthFormatted}" 
+                                    Width="100"
+                                    x:DataType="models:Track"/>
+            </DataGrid.Columns>
+        </DataGrid>
+    
+        <!-- Dance Category TreeView (visible in tree mode) -->
+        <TreeView Grid.Row="1"
+                  x:Name="DanceTreeView"
+                  ItemsSource="{Binding DanceTreeDisplayRoot}"
+                  SelectedItem="{Binding SelectedTreeItem}"
+                  IsVisible="{Binding IsTreeViewMode}">
+            <TreeView.Styles>
+                <!-- Hide expander for root node -->
+                <Style Selector="TreeViewItem" x:DataType="models:DanceCategoryNode">
+                    <Setter Property="IsExpanded" Value="True"/>
+                </Style>
+            </TreeView.Styles>
+            <TreeView.DataTemplates>
+                <!-- Template for DanceCategoryNode (branches) -->
+                <TreeDataTemplate DataType="models:DanceCategoryNode" ItemsSource="{Binding Items}">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Grid.Column="0" Text="{Binding DisplayName}" FontWeight="SemiBold"/>
+                        <!-- Action buttons (visible when selected and not root for delete) -->
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2"
+                                    IsVisible="{Binding $parent[TreeViewItem].IsSelected}">
+                            <!-- Add Category Button (branch icon) -->
+                            <Button Padding="4,2"
+                                    Background="Transparent"
+                                    BorderThickness="0"
+                                    ToolTip.Tip="Add category"
+                                    Click="OnAddCategoryClick">
+                                <PathIcon Data="M3,19 L5,21 L17,5 L15,3 L3,19 Z M9,13 L11,15 L17,11 L15,9 L9,13 Z"
+                                          Width="14" Height="14"/>
+                            </Button>
+                            <!-- Add Dance Button (leaf icon) -->
+                            <Button Padding="4,2"
+                                    Background="Transparent"
+                                    BorderThickness="0"
+                                    ToolTip.Tip="Add dance"
+                                    Click="OnAddDanceClick">
+                                <PathIcon Data="M17,8C8,10 5.9,16.17 3.82,21.34L5.71,22L6.66,19.7C7.14,19.87 7.64,20 8,20C19,20 22,3 22,3C21,5 14,5.25 9,6.25C4,7.25 2,11.5 2,13.5C2,15.5 3.75,17.25 3.75,17.25C7,8 17,8 17,8Z"
+                                          Width="14" Height="14"/>
+                            </Button>
+                            <!-- Delete Button (not for root) -->
+                            <Button Padding="4,2"
+                                    Background="Transparent"
+                                    BorderThickness="0"
+                                    ToolTip.Tip="Delete"
+                                    IsVisible="{Binding !IsRoot}"
+                                    Click="OnDeleteClick">
+                                <PathIcon Data="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"
+                                          Width="14" Height="14" Foreground="#E74C3C"/>
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                </TreeDataTemplate>
+                <!-- Template for DanceItem (leaves) -->
+                <DataTemplate DataType="models:DanceItem">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Grid.Column="0" Text="{Binding DisplayName}"/>
+                        <!-- Delete button (visible when selected) -->
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2"
+                                    IsVisible="{Binding $parent[TreeViewItem].IsSelected}">
+                            <Button Padding="4,2"
+                                    Background="Transparent"
+                                    BorderThickness="0"
+                                    ToolTip.Tip="Delete"
+                                    Click="OnDeleteClick">
+                                <PathIcon Data="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"
+                                          Width="14" Height="14" Foreground="#E74C3C"/>
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                </DataTemplate>
+            </TreeView.DataTemplates>
+        </TreeView>
+    </Grid>
+</UserControl>

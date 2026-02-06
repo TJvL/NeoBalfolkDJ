@@ -1,0 +1,286 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:NeoBalfolkDJ.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="NeoBalfolkDJ.Views.SettingsView"
+             x:DataType="vm:SettingsViewModel">
+    
+    <Design.DataContext>
+        <vm:SettingsViewModel/>
+    </Design.DataContext>
+    
+    <Grid RowDefinitions="Auto,*">
+        <!-- Back button -->
+        <Button Grid.Row="0" 
+                Command="{Binding BackCommand}"
+                HorizontalAlignment="Left"
+                Margin="16,16,16,0"
+                Padding="8,6">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <PathIcon Data="M20,11V13H8L13.5,18.5L12.08,19.92L4.16,12L12.08,4.08L13.5,5.5L8,11H20Z"
+                          Width="16" Height="16"/>
+                <TextBlock Text="Back"/>
+            </StackPanel>
+        </Button>
+        
+        <!-- Settings content (visible when synonym editor is not visible) -->
+        <ScrollViewer Grid.Row="1" IsVisible="{Binding !IsSynonymEditorVisible}">
+            <StackPanel Spacing="16" Margin="16">
+                <TextBlock Text="Settings" FontSize="24" FontWeight="Bold"/>
+                
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Music Directory"/>
+                    <Grid ColumnDefinitions="*, Auto">
+                        <TextBox Grid.Column="0" 
+                                 Text="{Binding MusicDirectoryPath, Mode=TwoWay}"
+                                 Watermark="Select a directory..."
+                                 IsReadOnly="True"/>
+                        <Button Grid.Column="1" 
+                                Content="Browse..." 
+                                Margin="8,0,0,0"
+                                Click="OnBrowseButtonClick"/>
+                    </Grid>
+                </StackPanel>
+
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Maximum Queue Items"/>
+                    <NumericUpDown Value="{Binding MaxQueueItems, Mode=TwoWay}"
+                                   Minimum="1"
+                                   Maximum="100"
+                                   Increment="1"
+                                   Width="120"
+                                   HorizontalAlignment="Left"/>
+                </StackPanel>
+     
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Delay Duration (seconds)"/>
+                    <NumericUpDown Value="{Binding DelaySeconds, Mode=TwoWay}"
+                                   Minimum="1"
+                                   Maximum="300"
+                                   Increment="5"
+                                   Width="120"
+                                   HorizontalAlignment="Left"/>
+                    <TextBlock Text="Used for 'Request Delay' - pauses playback for this duration"
+                               FontSize="11"
+                               Opacity="0.6"/>
+                </StackPanel>
+
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Presentation Displays"/>
+                    <NumericUpDown Value="{Binding PresentationDisplayCount, Mode=TwoWay}"
+                                   Minimum="0"
+                                   Maximum="6"
+                                   Increment="1"
+                                   Width="120"
+                                   HorizontalAlignment="Left"/>
+                    <TextBlock Text="Number of presentation windows to show (0 = disabled)"
+                               FontSize="11"
+                               Opacity="0.6"/>
+                </StackPanel>
+
+                <StackPanel Spacing="8">
+                    <CheckBox Content="Auto-queue random track during playback"
+                              IsChecked="{Binding AutoQueueRandomTrack, Mode=TwoWay}"/>
+                    <TextBlock Text="Automatically adds a random track when playing. Removed when manually adding items."
+                               FontSize="11"
+                               Opacity="0.6"/>
+                </StackPanel>
+
+                <StackPanel Spacing="8">
+                    <CheckBox Content="Allow duplicate tracks in queue in the same session"
+                              IsChecked="{Binding AllowDuplicateTracksInQueue, Mode=TwoWay}"/>
+                    <TextBlock Text="When disabled, tracks that are currently playing, in the queue, or have already played this session cannot be added again."
+                               FontSize="11"
+                               Opacity="0.6"
+                               TextWrapping="Wrap"/>
+                </StackPanel>
+
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Theme"/>
+                    <ComboBox ItemsSource="{Binding AvailableThemes}"
+                              SelectedItem="{Binding SelectedTheme, Mode=TwoWay}"
+                              Width="120"
+                              HorizontalAlignment="Left"/>
+                    <TextBlock Text="Choose between Auto (follows system), Light, or Dark theme"
+                               FontSize="11"
+                               Opacity="0.6"/>
+                </StackPanel>
+
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Dance Synonyms"/>
+                    <Button Content="Edit Dance Synonyms"
+                            Command="{Binding EditSynonymsCommand}"
+                            HorizontalAlignment="Left"/>
+                    <TextBlock Text="Manage dance name synonyms for categorization"
+                               FontSize="11"
+                               Opacity="0.6"/>
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+        
+        <!-- Synonym Editor (visible when editing synonyms) -->
+        <Grid Grid.Row="1" IsVisible="{Binding IsSynonymEditorVisible}" Margin="16,0,16,16">
+            <Grid RowDefinitions="Auto,*" DataContext="{Binding SynonymEditor}">
+                <!-- Toolbar -->
+                <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="0,0,0,16">
+                    <TextBlock Text="Dance Synonyms" FontSize="24" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,16,0"/>
+                    
+                    <!-- Undo/Redo -->
+                    <Button Command="{Binding UndoCommand}"
+                            ToolTip.Tip="Undo (Ctrl+Z)"
+                            Padding="8">
+                        <PathIcon Data="M12.5,8C9.85,8 7.45,9 5.6,10.6L2,7V16H11L7.38,12.38C8.77,11.22 10.54,10.5 12.5,10.5C16.04,10.5 19.05,12.81 20.1,16L22.47,15.22C21.08,11.03 17.15,8 12.5,8Z"
+                                  Width="16" Height="16"/>
+                    </Button>
+                    <Button Command="{Binding RedoCommand}"
+                            ToolTip.Tip="Redo (Ctrl+Y)"
+                            Padding="8">
+                        <PathIcon Data="M18.4,10.6C16.55,9 14.15,8 11.5,8C6.85,8 2.92,11.03 1.54,15.22L3.9,16C4.95,12.81 7.95,10.5 11.5,10.5C13.45,10.5 15.23,11.22 16.62,12.38L13,16H22V7L18.4,10.6Z"
+                                  Width="16" Height="16"/>
+                    </Button>
+                    
+                    <Rectangle Width="1" Fill="{DynamicResource SystemControlForegroundBaseMediumLowBrush}" Margin="4,4"/>
+                    
+                    <!-- Import/Export -->
+                    <Button x:Name="ImportButton"
+                            ToolTip.Tip="Import synonyms"
+                            Padding="8"
+                            Click="OnImportClick">
+                        <PathIcon Data="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M13.5,16V19H10.5V16H8L12,12L16,16H13.5M13,9V3.5L18.5,9H13Z"
+                                  Width="16" Height="16"/>
+                    </Button>
+                    <Button x:Name="ExportButton"
+                            ToolTip.Tip="Export synonyms"
+                            Padding="8"
+                            Click="OnExportClick">
+                        <PathIcon Data="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M13.5,16V13H10.5V16H8L12,20L16,16H13.5M13,9V3.5L18.5,9H13Z"
+                                  Width="16" Height="16"/>
+                    </Button>
+                    
+                    <Rectangle Width="1" Fill="{DynamicResource SystemControlForegroundBaseMediumLowBrush}" Margin="4,4"/>
+                    
+                    <!-- Add Line -->
+                    <Button Command="{Binding AddLineCommand}"
+                            ToolTip.Tip="Add new dance"
+                            Padding="8">
+                        <PathIcon Data="M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z"
+                                  Width="16" Height="16"/>
+                    </Button>
+                </StackPanel>
+                
+                <!-- Entries List -->
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding Entries}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="vm:DanceSynonymEntryViewModel">
+                                <Border BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        Padding="12"
+                                        Margin="0,0,0,8">
+                                    <Grid RowDefinitions="Auto,Auto">
+                                        <!-- Header: Name and Delete -->
+                                        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,8">
+                                            <TextBox Grid.Column="0"
+                                                     Text="{Binding Name, Mode=TwoWay}"
+                                                     FontWeight="SemiBold"
+                                                     FontSize="14"
+                                                     Watermark="Dance name"/>
+                                            <Button Grid.Column="1"
+                                                    Command="{Binding RequestRemoveLineCommand}"
+                                                    ToolTip.Tip="Remove this dance"
+                                                    Padding="6"
+                                                    Margin="8,0,0,0">
+                                                <PathIcon Data="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"
+                                                          Width="12" Height="12"/>
+                                            </Button>
+                                        </Grid>
+                                        
+                                        <!-- Synonyms WrapPanel -->
+                                        <WrapPanel Grid.Row="1" Orientation="Horizontal">
+                                            <!-- Existing synonyms as tags -->
+                                            <ItemsControl ItemsSource="{Binding Synonyms}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <WrapPanel Orientation="Horizontal"/>
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Border Background="{DynamicResource SystemControlHighlightListAccentLowBrush}"
+                                                                CornerRadius="4"
+                                                                Padding="8,4"
+                                                                Margin="0,0,6,6">
+                                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                                <TextBlock Text="{Binding}" VerticalAlignment="Center"/>
+                                                                <Button Command="{Binding $parent[ItemsControl].((vm:DanceSynonymEntryViewModel)DataContext).RemoveSynonymCommand}"
+                                                                        CommandParameter="{Binding}"
+                                                                        Padding="2"
+                                                                        Background="Transparent"
+                                                                        BorderThickness="0"
+                                                                        VerticalAlignment="Center">
+                                                                    <PathIcon Data="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"
+                                                                              Width="10" Height="10"
+                                                                              Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"/>
+                                                                </Button>
+                                                            </StackPanel>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                            
+                                            <!-- Add synonym inline TextBox (visible when adding) -->
+                                            <Border Background="{DynamicResource SystemControlHighlightListAccentLowBrush}"
+                                                    CornerRadius="4"
+                                                    Padding="4,2"
+                                                    Margin="0,0,6,6"
+                                                    IsVisible="{Binding IsAddingSynonym}">
+                                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                                    <TextBox Text="{Binding NewSynonymText, Mode=TwoWay}"
+                                                             Width="120"
+                                                             Watermark="synonym"
+                                                             FontSize="12"
+                                                             Padding="4,2"
+                                                             BorderThickness="0"
+                                                             KeyDown="OnNewSynonymKeyDown"/>
+                                                    <Button Command="{Binding ConfirmAddSynonymCommand}"
+                                                            Padding="4"
+                                                            Background="Transparent"
+                                                            BorderThickness="0">
+                                                        <PathIcon Data="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z"
+                                                                  Width="12" Height="12"
+                                                                  Foreground="Green"/>
+                                                    </Button>
+                                                    <Button Command="{Binding CancelAddSynonymCommand}"
+                                                            Padding="4"
+                                                            Background="Transparent"
+                                                            BorderThickness="0">
+                                                        <PathIcon Data="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"
+                                                                  Width="12" Height="12"
+                                                                  Foreground="Red"/>
+                                                    </Button>
+                                                </StackPanel>
+                                            </Border>
+                                            
+                                            <!-- Add synonym button (visible when not adding) -->
+                                            <Button Command="{Binding StartAddSynonymCommand}"
+                                                    ToolTip.Tip="Add synonym"
+                                                    Padding="6,4"
+                                                    Margin="0,0,0,6"
+                                                    IsVisible="{Binding !IsAddingSynonym}">
+                                                <PathIcon Data="M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z"
+                                                          Width="12" Height="12"/>
+                                            </Button>
+                                        </WrapPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Grid>
+        </Grid>
+    </Grid>
+</UserControl>

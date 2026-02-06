@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AvaloniaProject">
+    <option name="projectPerEditor">
+      <map>
+        <entry key="NeoBalfolkDJ/App.axaml" value="NeoBalfolkDJ/NeoBalfolkDJ.csproj" />
+        <entry key="NeoBalfolkDJ/Views/AddDanceItemDialog.axaml" value="NeoBalfolkDJ/NeoBalfolkDJ.csproj" />
+        <entry key="NeoBalfolkDJ/Views/ConfirmDeleteDialog.axaml" value="NeoBalfolkDJ/NeoBalfolkDJ.csproj" />
+        <entry key="NeoBalfolkDJ/Views/ConfirmationDialog.axaml" value="NeoBalfolkDJ/NeoBalfolkDJ.csproj" />
+        <entry key="NeoBalfolkDJ/Views/DanceSynonymEditorDialog.axaml" value="NeoBalfolkDJ/NeoBalfolkDJ.csproj" />
+        <entry key="NeoBalfolkDJ/Views/HelpView.axaml" value="NeoBalfolkDJ/NeoBalfolkDJ.csproj" />
+        <entry key="NeoBalfolkDJ/Views/MainWindow.axaml" value="NeoBalfolkDJ/NeoBalfolkDJ.csproj" />
+        <entry key="NeoBalfolkDJ/Views/NotificationView.axaml" value="NeoBalfolkDJ/NeoBalfolkDJ.csproj" />
+        <entry key="NeoBalfolkDJ/Views/PlaybackView.axaml" value="NeoBalfolkDJ/NeoBalfolkDJ.csproj" />
+        <entry key="NeoBalfolkDJ/Views/PresentationWindow.axaml" value="NeoBalfolkDJ/NeoBalfolkDJ.csproj" />
+        <entry key="NeoBalfolkDJ/Views/QueueView.axaml" value="NeoBalfolkDJ/NeoBalfolkDJ.csproj" />
+        <entry key="NeoBalfolkDJ/Views/RequestMessageDialog.axaml" value="NeoBalfolkDJ/NeoBalfolkDJ.csproj" />
+        <entry key="NeoBalfolkDJ/Views/SettingsView.axaml" value="NeoBalfolkDJ/NeoBalfolkDJ.csproj" />
+        <entry key="NeoBalfolkDJ/Views/ToolbarView.axaml" value="NeoBalfolkDJ/NeoBalfolkDJ.csproj" />
+        <entry key="NeoBalfolkDJ/Views/TrackListView.axaml" value="NeoBalfolkDJ/NeoBalfolkDJ.csproj" />
+      </map>
+    </option>
+  </component>
+</project>
