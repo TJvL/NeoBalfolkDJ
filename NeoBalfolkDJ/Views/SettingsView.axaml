@@ -74,7 +74,8 @@
                                    Maximum="6"
                                    Increment="1"
                                    Width="120"
-                                   HorizontalAlignment="Left"/>
+                                   HorizontalAlignment="Left"
+                                   Focusable="False"/>
                     <TextBlock Text="Number of presentation windows to show (0 = disabled)"
                                FontSize="11"
                                Opacity="0.6"/>
@@ -82,7 +83,8 @@
 
                 <StackPanel Spacing="8">
                     <CheckBox Content="Auto-queue random track during playback"
-                              IsChecked="{Binding AutoQueueRandomTrack, Mode=TwoWay}"/>
+                              IsChecked="{Binding AutoQueueRandomTrack, Mode=TwoWay}"
+                              Focusable="False"/>
                     <TextBlock Text="Automatically adds a random track when playing. Removed when manually adding items."
                                FontSize="11"
                                Opacity="0.6"/>
@@ -90,7 +92,8 @@
 
                 <StackPanel Spacing="8">
                     <CheckBox Content="Allow duplicate tracks in queue in the same session"
-                              IsChecked="{Binding AllowDuplicateTracksInQueue, Mode=TwoWay}"/>
+                              IsChecked="{Binding AllowDuplicateTracksInQueue, Mode=TwoWay}"
+                              Focusable="False"/>
                     <TextBlock Text="When disabled, tracks that are currently playing, in the queue, or have already played this session cannot be added again."
                                FontSize="11"
                                Opacity="0.6"
@@ -102,7 +105,8 @@
                     <ComboBox ItemsSource="{Binding AvailableThemes}"
                               SelectedItem="{Binding SelectedTheme, Mode=TwoWay}"
                               Width="120"
-                              HorizontalAlignment="Left"/>
+                              HorizontalAlignment="Left"
+                              Focusable="False"/>
                     <TextBlock Text="Choose between Auto (follows system), Light, or Dark theme"
                                FontSize="11"
                                Opacity="0.6"/>
@@ -112,7 +116,8 @@
                     <TextBlock Text="Dance Synonyms"/>
                     <Button Content="Edit Dance Synonyms"
                             Command="{Binding EditSynonymsCommand}"
-                            HorizontalAlignment="Left"/>
+                            HorizontalAlignment="Left"
+                            Focusable="False"/>
                     <TextBlock Text="Manage dance name synonyms for categorization"
                                FontSize="11"
                                Opacity="0.6"/>
@@ -123,7 +128,8 @@
                     <TextBlock Text="Troubleshooting" FontSize="18" FontWeight="SemiBold"/>
                     <Button Content="Export Log File"
                             Command="{Binding ExportLogCommand}"
-                            HorizontalAlignment="Left"/>
+                            HorizontalAlignment="Left"
+                            Focusable="False"/>
                     <TextBlock Text="Save the application log file for troubleshooting or bug reports"
                                FontSize="11"
                                Opacity="0.6"/>
@@ -141,13 +147,15 @@
                     <!-- Undo/Redo -->
                     <Button Command="{Binding UndoCommand}"
                             ToolTip.Tip="Undo (Ctrl+Z)"
-                            Padding="8">
+                            Padding="8"
+                            Focusable="False">
                         <PathIcon Data="M12.5,8C9.85,8 7.45,9 5.6,10.6L2,7V16H11L7.38,12.38C8.77,11.22 10.54,10.5 12.5,10.5C16.04,10.5 19.05,12.81 20.1,16L22.47,15.22C21.08,11.03 17.15,8 12.5,8Z"
                                   Width="16" Height="16"/>
                     </Button>
                     <Button Command="{Binding RedoCommand}"
                             ToolTip.Tip="Redo (Ctrl+Shift+Z)"
-                            Padding="8">
+                            Padding="8"
+                            Focusable="False">
                         <PathIcon Data="M18.4,10.6C16.55,9 14.15,8 11.5,8C6.85,8 2.92,11.03 1.54,15.22L3.9,16C4.95,12.81 7.95,10.5 11.5,10.5C13.45,10.5 15.23,11.22 16.62,12.38L13,16H22V7L18.4,10.6Z"
                                   Width="16" Height="16"/>
                     </Button>
@@ -158,14 +166,17 @@
                     <Button x:Name="ImportButton"
                             ToolTip.Tip="Import synonyms"
                             Padding="8"
-                            Click="OnImportClick">
+                            Click="OnImportClick"
+                            Focusable="False">
                         <PathIcon Data="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M13.5,16V19H10.5V16H8L12,12L16,16H13.5M13,9V3.5L18.5,9H13Z"
                                   Width="16" Height="16"/>
                     </Button>
                     <Button x:Name="ExportButton"
                             ToolTip.Tip="Export synonyms"
                             Padding="8"
-                            Click="OnExportClick">
+                            IsEnabled="{Binding HasEntries}"
+                            Click="OnExportClick"
+                            Focusable="False">
                         <PathIcon Data="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M13.5,16V13H10.5V16H8L12,20L16,16H13.5M13,9V3.5L18.5,9H13Z"
                                   Width="16" Height="16"/>
                     </Button>
@@ -175,7 +186,8 @@
                     <!-- Add Line -->
                     <Button Command="{Binding AddLineCommand}"
                             ToolTip.Tip="Add new dance"
-                            Padding="8">
+                            Padding="8"
+                            Focusable="False">
                         <PathIcon Data="M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z"
                                   Width="16" Height="16"/>
                     </Button>
@@ -203,7 +215,8 @@
                                                     Command="{Binding RequestRemoveLineCommand}"
                                                     ToolTip.Tip="Remove this dance"
                                                     Padding="6"
-                                                    Margin="8,0,0,0">
+                                                    Margin="8,0,0,0"
+                                                    Focusable="False">
                                                 <PathIcon Data="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"
                                                           Width="12" Height="12"/>
                                             </Button>
@@ -231,7 +244,8 @@
                                                                         Padding="2"
                                                                         Background="Transparent"
                                                                         BorderThickness="0"
-                                                                        VerticalAlignment="Center">
+                                                                        VerticalAlignment="Center"
+                                                                        Focusable="False">
                                                                     <PathIcon Data="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"
                                                                               Width="10" Height="10"
                                                                               Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"/>
@@ -259,7 +273,8 @@
                                                     <Button Command="{Binding ConfirmAddSynonymCommand}"
                                                             Padding="4"
                                                             Background="Transparent"
-                                                            BorderThickness="0">
+                                                            BorderThickness="0"
+                                                            Focusable="False">
                                                         <PathIcon Data="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z"
                                                                   Width="12" Height="12"
                                                                   Foreground="Green"/>
@@ -267,7 +282,8 @@
                                                     <Button Command="{Binding CancelAddSynonymCommand}"
                                                             Padding="4"
                                                             Background="Transparent"
-                                                            BorderThickness="0">
+                                                            BorderThickness="0"
+                                                            Focusable="False">
                                                         <PathIcon Data="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"
                                                                   Width="12" Height="12"
                                                                   Foreground="Red"/>
@@ -280,7 +296,8 @@
                                                     ToolTip.Tip="Add synonym"
                                                     Padding="6,4"
                                                     Margin="0,0,0,6"
-                                                    IsVisible="{Binding !IsAddingSynonym}">
+                                                    IsVisible="{Binding !IsAddingSynonym}"
+                                                    Focusable="False">
                                                 <PathIcon Data="M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z"
                                                           Width="12" Height="12"/>
                                             </Button>

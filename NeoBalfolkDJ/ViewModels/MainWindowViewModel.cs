@@ -1,4 +1,4 @@
-﻿using System;
+﻿﻿using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.ComponentModel;
@@ -154,9 +154,13 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
         // Wire up playback orchestration
         Queue.QueuedItems.CollectionChanged += OnQueueCollectionChanged;
         Playback.PropertyChanged += OnPlaybackPropertyChanged;
+        SessionHistory.HistoryChanged += OnHistoryChanged;
 
         // Initialize playback button state based on queue
         Playback.QueueHasItems = Queue.HasItems;
+        
+        // Initialize history button state
+        Toolbar.HasHistory = SessionHistory.PlayedTracks.Count > 0;
 
         // Load tracks from configured directory on startup
         LoadTracksFromSettings();
@@ -392,6 +396,12 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
         // 2. When the user explicitly clicks refresh on an auto-queued item
         // 3. When auto-queue setting is enabled
         // This prevents unwanted refresh when user manually removes items.
+    }
+
+    private void OnHistoryChanged(object? sender, EventArgs e)
+    {
+        // Update toolbar button state based on history content
+        Toolbar.HasHistory = SessionHistory.PlayedTracks.Count > 0;
     }
 
     private void OnFirstItemChanged(IQueueItem? item)

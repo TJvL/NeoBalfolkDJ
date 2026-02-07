@@ -10,6 +10,9 @@ public partial class ConfirmDeleteDialog : Window
     public ConfirmDeleteDialog()
     {
         InitializeComponent();
+        
+        // Focus the Yes button when opened so Enter/Esc work
+        Opened += (_, _) => YesButton.Focus();
     }
 
     /// <summary>

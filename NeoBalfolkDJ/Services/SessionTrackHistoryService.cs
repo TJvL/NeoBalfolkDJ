@@ -106,6 +106,7 @@ public sealed class SessionTrackHistoryService : ISessionTrackHistoryService, ID
 
         var exportData = new
         {
+            exportedAt = DateTimeOffset.Now.ToString("yyyy-MM-ddTHH:mm:sszzz"),
             tracks = _playedTracks.Select(t => new
             {
                 dance = t.Dance,

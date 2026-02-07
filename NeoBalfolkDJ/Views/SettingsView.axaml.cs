@@ -59,7 +59,6 @@ public partial class SettingsView : UserControl
                 "Do you want to continue?");
 
             await confirmDialog.ShowDialog((Window)topLevel);
-
             if (!confirmDialog.IsConfirmed) return;
 
             var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions

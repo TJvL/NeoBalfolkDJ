@@ -12,6 +12,9 @@ public partial class AddDanceItemDialog : Window
     public AddDanceItemDialog()
     {
         InitializeComponent();
+        
+        // Focus the name text box when opened so keyboard input works immediately
+        Opened += (_, _) => NameTextBox.Focus();
     }
 
     /// <summary>
@@ -32,7 +35,7 @@ public partial class AddDanceItemDialog : Window
         TitleText.Text = "Add Dance";
     }
 
-    private void OnOkClick(object? sender, RoutedEventArgs e)
+    private void TryConfirm()
     {
         var name = NameTextBox.Text?.Trim();
 
@@ -47,6 +50,11 @@ public partial class AddDanceItemDialog : Window
         ResultWeight = (int)(WeightInput.Value ?? 1);
         IsConfirmed = true;
         Close();
+    }
+
+    private void OnOkClick(object? sender, RoutedEventArgs e)
+    {
+        TryConfirm();
     }
 
     private void OnCancelClick(object? sender, RoutedEventArgs e)

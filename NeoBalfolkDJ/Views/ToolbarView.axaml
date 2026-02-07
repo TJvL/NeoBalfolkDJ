@@ -88,7 +88,8 @@
         <Button Command="{Binding ExportHistoryCommand}"
                 ToolTip.Tip="Export history to JSON"
                 Padding="8"
-                IsVisible="{Binding IsHistoryMode}">
+                IsVisible="{Binding IsHistoryMode}"
+                Focusable="False">
             <PathIcon Data="M5,20H19V18H5M19,9H15V3H9V9H5L12,16L19,9Z"
                       Width="16" Height="16"/>
         </Button>

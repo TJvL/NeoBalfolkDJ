@@ -80,7 +80,7 @@ public partial class PlaybackView : UserControl
         }
     }
 
-    private async void OnRestartConfirmationRequested(object? sender, EventArgs e)
+    private void OnRestartConfirmationRequested(object? sender, EventArgs e)
     {
         AsyncHelper.SafeFireAndForget(async () =>
         {
@@ -92,14 +92,21 @@ public partial class PlaybackView : UserControl
 
             await dialog.ShowDialog((Window)topLevel);
 
-            if (dialog.IsConfirmed && DataContext is PlaybackViewModel viewModel)
+            if (DataContext is PlaybackViewModel viewModel)
             {
-                await viewModel.ConfirmRestartAsync();
+                if (dialog.IsConfirmed)
+                {
+                    await viewModel.ConfirmRestartAsync();
+                }
+                else
+                {
+                    viewModel.CancelRestart();
+                }
             }
         });
     }
 
-    private async void OnSkipConfirmationRequested(object? sender, EventArgs e)
+    private void OnSkipConfirmationRequested(object? sender, EventArgs e)
     {
         AsyncHelper.SafeFireAndForget(async () =>
         {
@@ -111,14 +118,21 @@ public partial class PlaybackView : UserControl
 
             await dialog.ShowDialog((Window)topLevel);
 
-            if (dialog.IsConfirmed && DataContext is PlaybackViewModel viewModel)
+            if (DataContext is PlaybackViewModel viewModel)
             {
-                viewModel.ConfirmSkip();
+                if (dialog.IsConfirmed)
+                {
+                    viewModel.ConfirmSkip();
+                }
+                else
+                {
+                    viewModel.CancelSkip();
+                }
             }
         });
     }
 
-    private async void OnClearConfirmationRequested(object? sender, EventArgs e)
+    private void OnClearConfirmationRequested(object? sender, EventArgs e)
     {
         AsyncHelper.SafeFireAndForget(async () =>
         {
@@ -130,9 +144,16 @@ public partial class PlaybackView : UserControl
 
             await dialog.ShowDialog((Window)topLevel);
 
-            if (dialog.IsConfirmed && DataContext is PlaybackViewModel viewModel)
+            if (DataContext is PlaybackViewModel viewModel)
             {
-                viewModel.ConfirmClear();
+                if (dialog.IsConfirmed)
+                {
+                    viewModel.ConfirmClear();
+                }
+                else
+                {
+                    viewModel.CancelClear();
+                }
             }
         });
     }

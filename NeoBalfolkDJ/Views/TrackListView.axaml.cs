@@ -47,7 +47,6 @@ public partial class TrackListView : UserControl
                 "Do you want to continue?");
 
             await confirmDialog.ShowDialog((Window)topLevel);
-
             if (!confirmDialog.IsConfirmed) return;
 
             var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
@@ -158,6 +157,14 @@ public partial class TrackListView : UserControl
 
             viewModel.DeleteItem(args.Item, args.Parent);
         });
+    }
+
+    private void OnImportDanceTreeClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is TrackListViewModel viewModel)
+        {
+            viewModel.RequestImportDanceTreeCommand.Execute(null);
+        }
     }
 
     private void OnAddCategoryClick(object? sender, RoutedEventArgs e)

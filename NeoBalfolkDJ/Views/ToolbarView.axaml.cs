@@ -52,9 +52,16 @@ public partial class ToolbarView : UserControl
 
             await dialog.ShowDialog((Window)topLevel);
 
-            if (dialog.IsConfirmed && DataContext is ToolbarViewModel viewModel)
+            if (DataContext is ToolbarViewModel viewModel)
             {
-                viewModel.ConfirmClearQueue();
+                if (dialog.IsConfirmed)
+                {
+                    viewModel.ConfirmClearQueue();
+                }
+                else
+                {
+                    viewModel.CancelClearQueue();
+                }
             }
         });
     }
@@ -71,9 +78,16 @@ public partial class ToolbarView : UserControl
 
             await dialog.ShowDialog((Window)topLevel);
 
-            if (dialog.IsConfirmed && DataContext is ToolbarViewModel viewModel)
+            if (DataContext is ToolbarViewModel viewModel)
             {
-                viewModel.ConfirmClearHistory();
+                if (dialog.IsConfirmed)
+                {
+                    viewModel.ConfirmClearHistory();
+                }
+                else
+                {
+                    viewModel.CancelClearHistory();
+                }
             }
         });
     }
@@ -90,9 +104,16 @@ public partial class ToolbarView : UserControl
 
             await dialog.ShowDialog((Window)topLevel);
 
-            if (dialog.IsConfirmed && DataContext is ToolbarViewModel viewModel)
+            if (DataContext is ToolbarViewModel viewModel)
             {
-                viewModel.ConfirmExit();
+                if (dialog.IsConfirmed)
+                {
+                    viewModel.ConfirmExit();
+                }
+                else
+                {
+                    viewModel.CancelExit();
+                }
             }
         });
     }

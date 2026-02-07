@@ -386,9 +386,14 @@ public partial class PlaybackViewModel : ViewModelBase, IDisposable
         }
     }
 
+    private bool _isRestartDialogOpen;
+    
     [RelayCommand(CanExecute = nameof(CanRestart))]
     private void Restart()
     {
+        // Guard against re-entry (e.g., Enter key triggering command again after dialog closes)
+        if (_isRestartDialogOpen) return;
+        _isRestartDialogOpen = true;
         RestartConfirmationRequested?.Invoke(this, EventArgs.Empty);
     }
 
@@ -397,20 +402,38 @@ public partial class PlaybackViewModel : ViewModelBase, IDisposable
     /// </summary>
     public async Task ConfirmRestartAsync()
     {
+        _isRestartDialogOpen = false;
         if (!HasTrack || _playbackService == null) return;
         await _playbackService.RestartAsync();
     }
+    
+    /// <summary>
+    /// Called by View when user cancels restart dialog.
+    /// </summary>
+    public void CancelRestart()
+    {
+        _isRestartDialogOpen = false;
+    }
 
+    private bool _isSkipDialogOpen;
+    private bool _isClearDialogOpen;
+    
     [RelayCommand(CanExecute = nameof(CanNextOrClear))]
     private void NextOrClear()
     {
         if (QueueHasItems)
         {
+            // Guard against re-entry
+            if (_isSkipDialogOpen) return;
+            _isSkipDialogOpen = true;
             // Queue has items - request confirmation before skipping
             SkipConfirmationRequested?.Invoke(this, EventArgs.Empty);
         }
         else if (HasTrack)
         {
+            // Guard against re-entry
+            if (_isClearDialogOpen) return;
+            _isClearDialogOpen = true;
             // No queue items but track is loaded - request confirmation before clearing
             ClearConfirmationRequested?.Invoke(this, EventArgs.Empty);
         }
@@ -432,7 +455,16 @@ public partial class PlaybackViewModel : ViewModelBase, IDisposable
     /// </summary>
     public void ConfirmSkip()
     {
+        _isSkipDialogOpen = false;
         _commandBus?.SendAsync(new PlayNextTrackCommand());
+    }
+    
+    /// <summary>
+    /// Called by View when user cancels skip dialog.
+    /// </summary>
+    public void CancelSkip()
+    {
+        _isSkipDialogOpen = false;
     }
 
     /// <summary>
@@ -440,7 +472,16 @@ public partial class PlaybackViewModel : ViewModelBase, IDisposable
     /// </summary>
     public void ConfirmClear()
     {
+        _isClearDialogOpen = false;
         _ = ClearTrackAsync();
+    }
+    
+    /// <summary>
+    /// Called by View when user cancels clear dialog.
+    /// </summary>
+    public void CancelClear()
+    {
+        _isClearDialogOpen = false;
     }
 
     public void Dispose()

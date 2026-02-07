@@ -56,6 +56,12 @@ public partial class TrackListViewModel : ViewModelBase
                                      SelectedTreeItem is not DanceCategoryNode { IsRoot: true };
 
     /// <summary>
+    /// Whether there are actual dance tree entries to export (excludes virtual root).
+    /// Checks the virtual root's children since that reflects the actual tree structure.
+    /// </summary>
+    public bool HasDanceTreeEntries => _virtualRoot?.Children?.Count > 0;
+
+    /// <summary>
     /// Gets the selected dance node for weighted random selection.
     /// For DanceCategoryNode: returns that node.
     /// For DanceItem: returns a temporary wrapper node containing just that dance.
@@ -205,7 +211,7 @@ public partial class TrackListViewModel : ViewModelBase
         ImportDanceTreeRequested?.Invoke(this, EventArgs.Empty);
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(HasDanceTreeEntries))]
     private void RequestExportDanceTree()
     {
         ExportDanceTreeRequested?.Invoke(this, EventArgs.Empty);
@@ -381,6 +387,10 @@ public partial class TrackListViewModel : ViewModelBase
 
         // The actual categories are the children of the virtual root
         _danceCategoryService.Save();
+        
+        // Notify that export availability may have changed
+        OnPropertyChanged(nameof(HasDanceTreeEntries));
+        RequestExportDanceTreeCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnSearchTextChanged(string value)
@@ -546,18 +556,20 @@ public partial class TrackListViewModel : ViewModelBase
         if (_danceCategoryService == null)
             return;
 
+        // Get the categories list - this is a reference to the service's internal list
         var categories = _danceCategoryService.Load();
         foreach (var category in categories)
         {
             DanceTreeRoot.Add(category);
         }
 
-        // Create virtual root node
+        // Create virtual root node - use the SAME list reference, not a copy!
+        // This ensures edits to _virtualRoot.Children also modify the service's data
         _virtualRoot = new DanceCategoryNode
         {
             Name = "Dance",
             IsRoot = true,
-            Children = [..categories]
+            Children = categories  // Direct reference, NOT [..categories] which copies!
         };
         _virtualRoot.RefreshItems();
 
@@ -565,5 +577,9 @@ public partial class TrackListViewModel : ViewModelBase
 
         // Select the root node by default
         SelectedTreeItem = _virtualRoot;
+        
+        // Notify that export availability may have changed
+        OnPropertyChanged(nameof(HasDanceTreeEntries));
+        RequestExportDanceTreeCommand.NotifyCanExecuteChanged();
     }
 }

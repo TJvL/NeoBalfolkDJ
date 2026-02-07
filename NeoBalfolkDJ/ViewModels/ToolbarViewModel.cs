@@ -14,6 +14,11 @@ public partial class ToolbarViewModel(ICommandBus commandBus) : ViewModelBase
     [ObservableProperty]
     private bool _canClearQueue;
 
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ClearHistoryCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ExportHistoryCommand))]
+    private bool _hasHistory;
+
     /// <summary>
     /// Event raised when exit is requested (after confirmation)
     /// </summary>
@@ -86,9 +91,14 @@ public partial class ToolbarViewModel(ICommandBus commandBus) : ViewModelBase
         commandBus.SendAsync(new RemoveSelectedQueueItemCommand());
     }
 
+    private bool _isClearQueueDialogOpen;
+    
     [RelayCommand]
     private void ClearQueue()
     {
+        // Guard against re-entry (e.g., Enter key triggering command again after dialog closes)
+        if (_isClearQueueDialogOpen) return;
+        _isClearQueueDialogOpen = true;
         ClearQueueConfirmationRequested?.Invoke(this, EventArgs.Empty);
     }
 
@@ -97,18 +107,32 @@ public partial class ToolbarViewModel(ICommandBus commandBus) : ViewModelBase
     /// </summary>
     public void ConfirmClearQueue()
     {
+        _isClearQueueDialogOpen = false;
         commandBus.SendAsync(new ClearQueueCommand());
     }
+    
+    /// <summary>
+    /// Called by View when user cancels clear queue dialog.
+    /// </summary>
+    public void CancelClearQueue()
+    {
+        _isClearQueueDialogOpen = false;
+    }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(HasHistory))]
     private void ExportHistory()
     {
         ExportHistoryRequested?.Invoke(this, EventArgs.Empty);
     }
 
-    [RelayCommand]
+    private bool _isClearHistoryDialogOpen;
+
+    [RelayCommand(CanExecute = nameof(HasHistory))]
     private void ClearHistory()
     {
+        // Guard against re-entry (e.g., Enter key triggering command again after dialog closes)
+        if (_isClearHistoryDialogOpen) return;
+        _isClearHistoryDialogOpen = true;
         ClearHistoryConfirmationRequested?.Invoke(this, EventArgs.Empty);
     }
 
@@ -117,12 +141,26 @@ public partial class ToolbarViewModel(ICommandBus commandBus) : ViewModelBase
     /// </summary>
     public void ConfirmClearHistory()
     {
+        _isClearHistoryDialogOpen = false;
         commandBus.SendAsync(new ClearHistoryCommand());
     }
+    
+    /// <summary>
+    /// Called by View when user cancels clear history dialog.
+    /// </summary>
+    public void CancelClearHistory()
+    {
+        _isClearHistoryDialogOpen = false;
+    }
 
+    private bool _isExitDialogOpen;
+    
     [RelayCommand]
     private void Exit()
     {
+        // Guard against re-entry (e.g., Enter key triggering command again after dialog closes)
+        if (_isExitDialogOpen) return;
+        _isExitDialogOpen = true;
         ExitConfirmationRequested?.Invoke(this, EventArgs.Empty);
     }
 
@@ -131,7 +169,16 @@ public partial class ToolbarViewModel(ICommandBus commandBus) : ViewModelBase
     /// </summary>
     public void ConfirmExit()
     {
+        _isExitDialogOpen = false;
         ExitRequested?.Invoke(this, EventArgs.Empty);
+    }
+    
+    /// <summary>
+    /// Called by View when user cancels exit dialog.
+    /// </summary>
+    public void CancelExit()
+    {
+        _isExitDialogOpen = false;
     }
 
     /// <summary>

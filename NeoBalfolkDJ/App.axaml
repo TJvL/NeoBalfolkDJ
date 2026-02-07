@@ -12,5 +12,13 @@
     <Application.Styles>
         <FluentTheme />
         <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml"/>
+        
+        <!-- Disabled button style - make visually obvious with reduced opacity -->
+        <Style Selector="Button:disabled">
+            <Setter Property="Opacity" Value="0.4"/>
+        </Style>
+        <Style Selector="Button:disabled /template/ ContentPresenter">
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorDisabledBrush}"/>
+        </Style>
     </Application.Styles>
 </Application>

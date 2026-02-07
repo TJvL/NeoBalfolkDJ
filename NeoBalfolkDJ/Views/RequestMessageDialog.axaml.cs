@@ -28,13 +28,18 @@ public partial class RequestMessageDialog : Window
         DelayPanel.IsVisible = UseDelayCheckBox.IsChecked == true;
     }
 
-    private void OnOkClick(object? sender, RoutedEventArgs e)
+    private void TryConfirm()
     {
         if (string.IsNullOrWhiteSpace(MessageTextBox.Text))
             return;
 
         IsConfirmed = true;
         Close();
+    }
+
+    private void OnOkClick(object? sender, RoutedEventArgs e)
+    {
+        TryConfirm();
     }
 
     private void OnCancelClick(object? sender, RoutedEventArgs e)

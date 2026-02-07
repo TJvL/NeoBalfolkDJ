@@ -27,6 +27,7 @@
             <Button x:Name="NoButton" 
                     Content="No" 
                     Width="80"
+                    IsCancel="True"
                     Click="OnNoClick"/>
             <!-- The accent class is provided by FluentAvalonia at runtime, so these are false positives. -->
             <!-- ReSharper disable once Xaml.StyleClassNotFound -->
@@ -34,6 +35,7 @@
                     Content="Yes" 
                     Width="80"
                     Classes="accent"
+                    IsDefault="True"
                     Click="OnYesClick"/>
         </StackPanel>
     </Grid>

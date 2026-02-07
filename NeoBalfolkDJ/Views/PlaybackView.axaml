@@ -65,7 +65,6 @@
                                        VerticalAlignment="Center"/>
                             <TextBlock Text="{Binding TrackTitle}" 
                                        FontSize="16"
-                                       FontStyle="Italic"
                                        VerticalAlignment="Center"/>
                         </StackPanel>
                     </Canvas>
@@ -106,7 +105,8 @@
                             Width="60" 
                             Height="40"
                             HorizontalContentAlignment="Center"
-                            VerticalContentAlignment="Center">
+                            VerticalContentAlignment="Center"
+                            Focusable="False">
                         <Panel>
                             <PathIcon Data="M8,5.14V19.14L19,12.14L8,5.14Z" IsVisible="{Binding !IsPlaying}"/>
                             <PathIcon Data="M14,19H18V5H14M6,19H10V5H6V19Z" IsVisible="{Binding IsPlaying}"/>
@@ -117,14 +117,16 @@
                             Height="40"
                             HorizontalContentAlignment="Center"
                             VerticalContentAlignment="Center"
-                            ToolTip.Tip="Restart track">
+                            ToolTip.Tip="Restart track"
+                            Focusable="False">
                         <PathIcon Data="M12,5V1L7,6L12,11V7A6,6 0 0,1 18,13A6,6 0 0,1 12,19A6,6 0 0,1 6,13H4A8,8 0 0,0 12,21A8,8 0 0,0 20,13A8,8 0 0,0 12,5Z"/>
                     </Button>
                     <Button Command="{Binding NextOrClearCommand}" 
                             Width="60" 
                             Height="40"
                             HorizontalContentAlignment="Center"
-                            VerticalContentAlignment="Center">
+                            VerticalContentAlignment="Center"
+                            Focusable="False">
                         <Panel>
                             <!-- Next track icon - shown when queue has items -->
                             <PathIcon Data="M16,18H18V6H16M6,18L14.5,12L6,6V18Z" 

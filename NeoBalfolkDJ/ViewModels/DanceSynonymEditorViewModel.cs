@@ -116,6 +116,10 @@ public partial class DanceSynonymEditorViewModel : ViewModelBase, IDisposable
     [NotifyCanExecuteChangedFor(nameof(RedoCommand))]
     private bool _canRedo;
 
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ExportCommand))]
+    private bool _hasEntries;
+
     /// <summary>
     /// Event raised when import is requested (View shows file picker then confirmation).
     /// </summary>
@@ -168,6 +172,7 @@ public partial class DanceSynonymEditorViewModel : ViewModelBase, IDisposable
         {
             Entries.Add(new DanceSynonymEntryViewModel(this, synonym));
         }
+        HasEntries = Entries.Count > 0;
     }
 
     [RelayCommand]
@@ -281,7 +286,7 @@ public partial class DanceSynonymEditorViewModel : ViewModelBase, IDisposable
         ImportRequested?.Invoke(this, EventArgs.Empty);
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(HasEntries))]
     private void Export()
     {
         ExportRequested?.Invoke(this, EventArgs.Empty);
