@@ -56,15 +56,7 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Publish
-        run: |
-          dotnet publish NeoBalfolkDJ/NeoBalfolkDJ.csproj \
-            -c Release \
-            -r ${{ matrix.runtime }} \
-            -p:ReleaseVersion=${{ inputs.version }} \
-            -p:PublishSingleFile=true \
-            -p:SelfContained=true \
-            -p:IncludeNativeLibrariesForSelfExtract=true \
-            -o publish
+        run: dotnet publish NeoBalfolkDJ/NeoBalfolkDJ.csproj -c Release -r ${{ matrix.runtime }} -p:ReleaseVersion=${{ inputs.version }} -p:PublishSingleFile=true -p:SelfContained=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish
 
       - name: Create archive (Windows)
         if: matrix.os == 'windows-latest'
