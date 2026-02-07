@@ -393,7 +393,7 @@ public class AddLineCommand(DanceSynonymService service, string name) : ISynonym
 
     public void Execute()
     {
-        service.GetMutableList().Add(_entry);
+        service.GetMutableList().Insert(0, _entry);
     }
 
     public void Undo()
