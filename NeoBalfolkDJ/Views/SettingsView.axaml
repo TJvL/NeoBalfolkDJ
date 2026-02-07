@@ -134,6 +134,13 @@
                                FontSize="11"
                                Opacity="0.6"/>
                 </StackPanel>
+
+                <!-- Version info -->
+                <TextBlock Text="{Binding AppVersion, StringFormat='Version {0}'}"
+                           FontSize="11"
+                           Opacity="0.5"
+                           Margin="0,24,0,0"
+                           HorizontalAlignment="Left"/>
             </StackPanel>
         </ScrollViewer>
         

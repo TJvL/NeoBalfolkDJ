@@ -1,0 +1,22 @@
+<Project>
+  <PropertyGroup>
+    <!-- Default version for dev builds -->
+    <Version>0.0.0-dev</Version>
+    <!-- IncludeSourceRevisionInInformationalVersion controls whether SourceRevisionId is appended -->
+    <IncludeSourceRevisionInInformationalVersion>true</IncludeSourceRevisionInInformationalVersion>
+  </PropertyGroup>
+
+  <!-- Use exact version for release builds when ReleaseVersion is provided -->
+  <PropertyGroup Condition="'$(ReleaseVersion)' != ''">
+    <Version>$(ReleaseVersion)</Version>
+    <InformationalVersion>$(ReleaseVersion)</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+  </PropertyGroup>
+
+  <!-- Get git commit hash for dev builds -->
+  <Target Name="SetGitVersion" BeforeTargets="InitializeSourceControlInformation" Condition="'$(ReleaseVersion)' == ''">
+    <Exec Command="git rev-parse --short=7 HEAD" ConsoleToMsBuild="true" StandardOutputImportance="low" IgnoreExitCode="true">
+      <Output TaskParameter="ConsoleOutput" PropertyName="SourceRevisionId" />
+    </Exec>
+  </Target>
+</Project>

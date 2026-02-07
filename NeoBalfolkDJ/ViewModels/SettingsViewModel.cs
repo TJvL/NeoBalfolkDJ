@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -71,6 +72,12 @@ public partial class SettingsViewModel : ViewModelBase
     private DanceSynonymEditorViewModel? _synonymEditor;
 
     public AppTheme[] AvailableThemes { get; } = [AppTheme.Auto, AppTheme.Light, AppTheme.Dark];
+
+    /// <summary>
+    /// Gets the application version from assembly metadata.
+    /// </summary>
+    public string AppVersion { get; } = Assembly.GetExecutingAssembly()
+        .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "unknown";
 
     private IDanceSynonymService? _synonymService;
 
