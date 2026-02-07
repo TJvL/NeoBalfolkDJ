@@ -11,6 +11,9 @@ public partial class ToolbarViewModel(ICommandBus commandBus) : ViewModelBase
     [ObservableProperty]
     private bool _isHistoryMode;
 
+    [ObservableProperty]
+    private bool _canClearQueue;
+
     /// <summary>
     /// Event raised when exit is requested (after confirmation)
     /// </summary>

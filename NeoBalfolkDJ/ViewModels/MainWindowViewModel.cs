@@ -4,7 +4,6 @@ using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Threading.Tasks;
 using Avalonia.Controls;
-using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using NeoBalfolkDJ.Helpers;
 using NeoBalfolkDJ.Messaging;
@@ -380,16 +379,19 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
     {
         // Update playback button states based on queue status
         Playback.QueueHasItems = Queue.HasItems;
+        
+        // Update toolbar button states - can only clear if there are manual (non-auto-queue) items
+        Toolbar.CanClearQueue = Queue.CanClearQueue;
 
         // Update next item on presentation displays
         _presentationService?.UpdateNextItem(Queue.PeekFirst());
 
-        // Try to auto-queue if enabled, playing, and queue has no manual items
-        // Use Dispatcher.Post to avoid modifying collection during CollectionChanged event
-        if (Playback.IsPlaying && !Queue.HasManualItems)
-        {
-            Dispatcher.UIThread.Post(TryAutoQueueRandomTrack);
-        }
+        // Note: Auto-queue is NOT triggered here on purpose.
+        // Auto-queue only happens:
+        // 1. After a track finishes playing (in PlayNextFromQueue)
+        // 2. When the user explicitly clicks refresh on an auto-queued item
+        // 3. When auto-queue setting is enabled
+        // This prevents unwanted refresh when user manually removes items.
     }
 
     private void OnFirstItemChanged(IQueueItem? item)
@@ -449,6 +451,8 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
                 Queue.RemoveAutoQueuedItems();
                 Queue.SetCurrentlyPlayingTrack(null);
                 _presentationService?.ShowStopMarker();
+                // Try to auto-queue so user sees next track while stopped
+                TryAutoQueueRandomTrack();
                 _presentationService?.UpdateNextItem(Queue.PeekFirst());
                 return;
 
@@ -479,6 +483,8 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
                     PreloadService.Clear();
                     Queue.RemoveAutoQueuedItems();
                     _presentationService?.ShowMessageMarker(message.Message, null);
+                    // Try to auto-queue so user sees next track while stopped
+                    TryAutoQueueRandomTrack();
                     _presentationService?.UpdateNextItem(Queue.PeekFirst());
                 }
                 return;
@@ -543,6 +549,10 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
 
         var totalMs = (long)delay.Duration.TotalMilliseconds;
         Playback.ShowDelayMarker(totalMs);
+        
+        // Try to auto-queue so user sees next track during delay
+        TryAutoQueueRandomTrack();
+        _presentationService?.UpdateNextItem(Queue.PeekFirst());
 
         try
         {
@@ -577,6 +587,10 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
 
         var totalMs = (long)message.DelayDuration!.Value.TotalMilliseconds;
         Playback.ShowMessageMarker(message.Message, totalMs);
+        
+        // Try to auto-queue so user sees next track during message delay
+        TryAutoQueueRandomTrack();
+        _presentationService?.UpdateNextItem(Queue.PeekFirst());
 
         try
         {

@@ -67,14 +67,16 @@
         <Button Command="{Binding RemoveSelectedItemCommand}"
                 ToolTip.Tip="Remove item from queue"
                 Padding="8"
-                IsVisible="{Binding !IsHistoryMode}">
+                IsVisible="{Binding !IsHistoryMode}"
+                IsEnabled="{Binding CanClearQueue}">
             <PathIcon Data="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"
                       Width="16" Height="16"/>
         </Button>
         <Button Command="{Binding ClearQueueCommand}"
                 ToolTip.Tip="Clear entire queue"
                 Padding="8"
-                IsVisible="{Binding !IsHistoryMode}">
+                IsVisible="{Binding !IsHistoryMode}"
+                IsEnabled="{Binding CanClearQueue}">
             <PathIcon Data="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"
                       Width="16" Height="16"/>
         </Button>

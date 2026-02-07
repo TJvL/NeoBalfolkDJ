@@ -33,8 +33,35 @@ public partial class QueueViewModel : ViewModelBase
     // Note: SettingsRequested replaced by ShowSettingsCommand
     // Note: RefreshAutoQueuedTrackRequested replaced by RefreshAutoQueueCommand
 
-    [ObservableProperty]
     private IQueueItem? _selectedItem;
+    
+    /// <summary>
+    /// The currently selected item in the queue.
+    /// Auto-queued items cannot be selected - they cannot be manipulated by the user.
+    /// </summary>
+    public IQueueItem? SelectedItem
+    {
+        get => _selectedItem;
+        set
+        {
+            // Prevent selection of auto-queued items
+            if (value is AutoQueuedTrack)
+            {
+                return;
+            }
+            
+            if (SetProperty(ref _selectedItem, value))
+            {
+                OnPropertyChanged(nameof(SelectedItem));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Returns true if the queue can be cleared (has manual items that can be removed).
+    /// Auto-queue items cannot be cleared - only disabled via settings.
+    /// </summary>
+    public bool CanClearQueue => HasManualItems;
 
     [ObservableProperty]
     private string _queueFinishTime = "queue finishes at: --:--";
@@ -117,6 +144,7 @@ public partial class QueueViewModel : ViewModelBase
     private void OnQueuedItemsChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         OnPropertyChanged(nameof(HasItems));
+        OnPropertyChanged(nameof(CanClearQueue));
     }
 
     /// <summary>

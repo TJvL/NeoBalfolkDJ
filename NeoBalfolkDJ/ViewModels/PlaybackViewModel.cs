@@ -67,6 +67,13 @@ public partial class PlaybackViewModel : ViewModelBase, IDisposable
     private bool _isStopMarkerActive;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanNextOrClear))]
+    [NotifyCanExecuteChangedFor(nameof(NextOrClearCommand))]
+    private bool _isDelayActive;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanNextOrClear))]
+    [NotifyCanExecuteChangedFor(nameof(NextOrClearCommand))]
     private bool _isMessageMode;
 
     public bool HasTrack => CurrentTrack != null;
@@ -82,9 +89,9 @@ public partial class PlaybackViewModel : ViewModelBase, IDisposable
     public bool CanRestart => HasTrack;
 
     /// <summary>
-    /// Next/Clear button enabled when queue has items OR a track is loaded OR stop marker is active
+    /// Next/Clear button enabled when queue has items OR a track is loaded OR any marker is active
     /// </summary>
-    public bool CanNextOrClear => QueueHasItems || HasTrack || IsStopMarkerActive;
+    public bool CanNextOrClear => QueueHasItems || HasTrack || IsStopMarkerActive || IsDelayActive || IsMessageMode;
 
     /// <summary>
     /// Show next icon when queue has items, otherwise show clear (X) icon
@@ -205,6 +212,7 @@ public partial class PlaybackViewModel : ViewModelBase, IDisposable
         {
             IsMessageMode = false;
             IsStopMarkerActive = false;
+            IsDelayActive = false;
             CurrentTrack = track;
             DanceName = track.Dance;
             ArtistName = track.Artist;
@@ -221,6 +229,7 @@ public partial class PlaybackViewModel : ViewModelBase, IDisposable
         {
             IsMessageMode = false;
             IsStopMarkerActive = false;
+            IsDelayActive = false;
             CurrentTrack = null;
             DanceName = "No track playing...";
             ArtistName = "...";
@@ -241,6 +250,7 @@ public partial class PlaybackViewModel : ViewModelBase, IDisposable
     {
         IsMessageMode = false;
         IsStopMarkerActive = true;
+        IsDelayActive = false;
         CurrentTrack = null;
         DanceName = "Stop";
         ArtistName = " ";
@@ -260,6 +270,7 @@ public partial class PlaybackViewModel : ViewModelBase, IDisposable
     {
         IsMessageMode = false;
         IsStopMarkerActive = false;
+        IsDelayActive = true;
         CurrentTrack = null;
         DanceName = "Delay";
         ArtistName = " ";
@@ -279,6 +290,7 @@ public partial class PlaybackViewModel : ViewModelBase, IDisposable
     public void ShowMessageMarker(string message, long? totalMs = null)
     {
         IsMessageMode = true;
+        IsDelayActive = false;
         CurrentTrack = null;
         DanceName = message;
         ArtistName = " ";
@@ -356,6 +368,7 @@ public partial class PlaybackViewModel : ViewModelBase, IDisposable
         if (IsStopMarkerActive && QueueHasItems)
         {
             IsStopMarkerActive = false;
+            IsDelayActive = false;
             _commandBus?.SendAsync(new PlayNextTrackCommand());
             return;
         }
@@ -401,13 +414,16 @@ public partial class PlaybackViewModel : ViewModelBase, IDisposable
             // No queue items but track is loaded - request confirmation before clearing
             ClearConfirmationRequested?.Invoke(this, EventArgs.Empty);
         }
-        else if (IsStopMarkerActive)
+        else if (IsStopMarkerActive || IsDelayActive || IsMessageMode)
         {
-            // Stop marker is active but no queue items - clear to empty state
+            // Marker is active but no queue items - clear to empty state
             IsStopMarkerActive = false;
+            IsDelayActive = false;
+            IsMessageMode = false;
             DanceName = "No track playing...";
             ArtistName = "...";
             TrackTitle = "...";
+            IsPlaying = false;
         }
     }
 
