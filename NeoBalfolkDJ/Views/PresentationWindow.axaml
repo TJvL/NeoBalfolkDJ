@@ -20,43 +20,43 @@
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="16">
                 <!-- Normal dance name (not message mode) -->
                 <TextBlock Text="{Binding CurrentDance}"
-                           FontSize="72"
+                           FontSize="96"
                            FontWeight="Bold"
                            HorizontalAlignment="Center"
                            Foreground="White"
                            IsVisible="{Binding !IsMessageMode}"/>
                 <!-- Message mode: auto-scaling text with view box -->
-                <Viewbox MaxHeight="150" 
+                <Viewbox MaxHeight="180" 
                          Stretch="Uniform"
                          StretchDirection="DownOnly"
                          HorizontalAlignment="Center"
                          IsVisible="{Binding IsMessageMode}"
                          Margin="40,0">
                     <TextBlock Text="{Binding CurrentDance}"
-                               FontSize="72"
+                               FontSize="96"
                                FontWeight="Bold"
                                HorizontalAlignment="Center"
                                Foreground="White"
                                TextWrapping="NoWrap"/>
                 </Viewbox>
                 <TextBlock Text="{Binding CurrentArtist}"
+                           FontSize="64"
+                           HorizontalAlignment="Center"
+                           Foreground="White"/>
+                <TextBlock Text="{Binding CurrentTitle}"
                            FontSize="48"
                            HorizontalAlignment="Center"
-                           Foreground="#cccccc"/>
-                <TextBlock Text="{Binding CurrentTitle}"
-                           FontSize="36"
-                           HorizontalAlignment="Center"
-                           Foreground="#999999"/>
+                           Foreground="#f5f5f5"/>
             </StackPanel>
         </Grid>
         
         <!-- Placeholder when no current track -->
         <TextBlock Grid.Row="0"
                    Text="No track playing"
-                   FontSize="48"
+                   FontSize="64"
                    HorizontalAlignment="Center"
                    VerticalAlignment="Center"
-                   Foreground="#666666"
+                   Foreground="#cccccc"
                    IsVisible="{Binding !HasCurrentItem}"/>
         
         <!-- Progress bar in the middle -->
@@ -73,33 +73,33 @@
         <Grid Grid.Row="2" VerticalAlignment="Center" IsVisible="{Binding HasNextItem}">
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
                 <TextBlock Text="Next:"
-                           FontSize="24"
-                           HorizontalAlignment="Center"
-                           Foreground="#666666"
-                           Margin="0,0,0,8"/>
-                <TextBlock Text="{Binding NextDance}"
-                           FontSize="48"
-                           FontWeight="Bold"
-                           HorizontalAlignment="Center"
-                           Foreground="#aaaaaa"/>
-                <TextBlock Text="{Binding NextArtist}"
                            FontSize="32"
                            HorizontalAlignment="Center"
-                           Foreground="#888888"/>
-                <TextBlock Text="{Binding NextTitle}"
-                           FontSize="24"
+                           Foreground="#cccccc"
+                           Margin="0,0,0,8"/>
+                <TextBlock Text="{Binding NextDance}"
+                           FontSize="64"
+                           FontWeight="Bold"
                            HorizontalAlignment="Center"
-                           Foreground="#666666"/>
+                           Foreground="White"/>
+                <TextBlock Text="{Binding NextArtist}"
+                           FontSize="48"
+                           HorizontalAlignment="Center"
+                           Foreground="#f0f0f0"/>
+                <TextBlock Text="{Binding NextTitle}"
+                           FontSize="36"
+                           HorizontalAlignment="Center"
+                           Foreground="#e0e0e0"/>
             </StackPanel>
         </Grid>
         
         <!-- Placeholder when no next item -->
         <TextBlock Grid.Row="2"
                    Text="Queue empty"
-                   FontSize="32"
+                   FontSize="48"
                    HorizontalAlignment="Center"
                    VerticalAlignment="Center"
-                   Foreground="#444444"
+                   Foreground="#aaaaaa"
                    IsVisible="{Binding !HasNextItem}"/>
     </Grid>
 </Window>
