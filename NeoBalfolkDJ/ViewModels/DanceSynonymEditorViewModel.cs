@@ -1,6 +1,5 @@
 using System;
 using System.Collections.ObjectModel;
-using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using NeoBalfolkDJ.Models;
@@ -14,33 +13,32 @@ namespace NeoBalfolkDJ.ViewModels;
 public partial class DanceSynonymEntryViewModel : ViewModelBase
 {
     private readonly DanceSynonymEditorViewModel _parent;
-    private readonly DanceSynonym _model;
-    
+
     [ObservableProperty]
     private string _name;
-    
+
     [ObservableProperty]
     private bool _isAddingSynonym;
-    
+
     [ObservableProperty]
     private string _newSynonymText = string.Empty;
-    
+
     public ObservableCollection<string> Synonyms { get; } = new();
-    
+
     public DanceSynonymEntryViewModel(DanceSynonymEditorViewModel parent, DanceSynonym model)
     {
         _parent = parent;
-        _model = model;
+        Model = model;
         _name = model.Name;
-        
+
         foreach (var synonym in model.Synonyms)
         {
             Synonyms.Add(synonym);
         }
     }
-    
-    public DanceSynonym Model => _model;
-    
+
+    private DanceSynonym Model { get; }
+
     partial void OnNameChanged(string? oldValue, string newValue)
     {
         if (oldValue != null && oldValue != newValue)
@@ -48,14 +46,14 @@ public partial class DanceSynonymEntryViewModel : ViewModelBase
             _parent.RenameEntry(this, newValue);
         }
     }
-    
+
     [RelayCommand]
     private void StartAddSynonym()
     {
         NewSynonymText = string.Empty;
         IsAddingSynonym = true;
     }
-    
+
     [RelayCommand]
     private void ConfirmAddSynonym()
     {
@@ -66,34 +64,34 @@ public partial class DanceSynonymEntryViewModel : ViewModelBase
         IsAddingSynonym = false;
         NewSynonymText = string.Empty;
     }
-    
+
     [RelayCommand]
     private void CancelAddSynonym()
     {
         IsAddingSynonym = false;
         NewSynonymText = string.Empty;
     }
-    
+
     [RelayCommand]
     private void RemoveSynonym(string synonym)
     {
         _parent.RemoveSynonym(this, synonym);
     }
-    
+
     [RelayCommand]
     private void RequestRemoveLine()
     {
         _parent.RequestRemoveLine(this);
     }
-    
+
     /// <summary>
     /// Refreshes the synonyms from the model.
     /// </summary>
     public void RefreshFromModel()
     {
-        Name = _model.Name;
+        Name = Model.Name;
         Synonyms.Clear();
-        foreach (var synonym in _model.Synonyms)
+        foreach (var synonym in Model.Synonyms)
         {
             Synonyms.Add(synonym);
         }
@@ -103,64 +101,66 @@ public partial class DanceSynonymEntryViewModel : ViewModelBase
 /// <summary>
 /// ViewModel for the Dance Synonym Editor dialog.
 /// </summary>
-public partial class DanceSynonymEditorViewModel : ViewModelBase
+public partial class DanceSynonymEditorViewModel : ViewModelBase, IDisposable
 {
-    private readonly DanceSynonymService _service;
-    
+    private readonly IDanceSynonymService _service;
+    private readonly INotificationService? _notificationService;
+
     public ObservableCollection<DanceSynonymEntryViewModel> Entries { get; } = new();
-    
+
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(UndoCommand))]
     private bool _canUndo;
-    
+
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(RedoCommand))]
     private bool _canRedo;
-    
+
     /// <summary>
     /// Event raised when import is requested (View shows file picker then confirmation).
     /// </summary>
     public event EventHandler? ImportRequested;
-    
+
     /// <summary>
     /// Event raised when export is requested (View shows file picker).
     /// </summary>
     public event EventHandler? ExportRequested;
-    
+
     /// <summary>
     /// Event raised when line deletion confirmation is needed.
     /// </summary>
     public event EventHandler<DanceSynonymEntryViewModel>? DeleteLineConfirmationRequested;
-    
-    public DanceSynonymEditorViewModel(DanceSynonymService service)
+
+    public DanceSynonymEditorViewModel(IDanceSynonymService service, INotificationService? notificationService = null)
     {
         _service = service;
-        
+        _notificationService = notificationService;
+
         // Subscribe to service events
         _service.DataChanged += OnDataChanged;
         _service.UndoRedoStateChanged += OnUndoRedoStateChanged;
-        
+
         // Load initial data
         RefreshFromService();
         UpdateUndoRedoState();
     }
-    
+
     private void OnDataChanged(object? sender, EventArgs e)
     {
         RefreshFromService();
     }
-    
+
     private void OnUndoRedoStateChanged(object? sender, EventArgs e)
     {
         UpdateUndoRedoState();
     }
-    
+
     private void UpdateUndoRedoState()
     {
         CanUndo = _service.CanUndo;
         CanRedo = _service.CanRedo;
     }
-    
+
     private void RefreshFromService()
     {
         Entries.Clear();
@@ -169,7 +169,7 @@ public partial class DanceSynonymEditorViewModel : ViewModelBase
             Entries.Add(new DanceSynonymEntryViewModel(this, synonym));
         }
     }
-    
+
     [RelayCommand]
     private void AddLine()
     {
@@ -177,15 +177,15 @@ public partial class DanceSynonymEditorViewModel : ViewModelBase
         var baseName = "New Dance";
         var name = baseName;
         var counter = 1;
-        
+
         while (_service.IsDuplicate(name))
         {
             name = $"{baseName} {counter++}";
         }
-        
-        _service.ExecuteCommand(new AddLineCommand(_service, name));
+
+        _service.AddEntry(new DanceSynonym { Name = name });
     }
-    
+
     public void RequestRemoveLine(DanceSynonymEntryViewModel entry)
     {
         if (entry.Synonyms.Count > 0)
@@ -199,16 +199,16 @@ public partial class DanceSynonymEditorViewModel : ViewModelBase
             ConfirmRemoveLine(entry);
         }
     }
-    
+
     public void ConfirmRemoveLine(DanceSynonymEntryViewModel entry)
     {
         var index = Entries.IndexOf(entry);
         if (index >= 0)
         {
-            _service.ExecuteCommand(new RemoveLineCommand(_service, index));
+            _service.RemoveEntry(index);
         }
     }
-    
+
     public void RenameEntry(DanceSynonymEntryViewModel entry, string newName)
     {
         // Check for duplicates
@@ -217,68 +217,76 @@ public partial class DanceSynonymEditorViewModel : ViewModelBase
         {
             // Revert to old name
             entry.RefreshFromModel();
-            _service.NotificationService?.ShowNotification("This name already exists", NotificationSeverity.Warning);
+            _notificationService?.ShowNotification("This name already exists", NotificationSeverity.Warning);
             return;
         }
-        
+
         if (string.IsNullOrWhiteSpace(newName))
         {
             entry.RefreshFromModel();
-            _service.NotificationService?.ShowNotification("Name cannot be empty", NotificationSeverity.Warning);
+            _notificationService?.ShowNotification("Name cannot be empty", NotificationSeverity.Warning);
             return;
         }
-        
-        _service.ExecuteCommand(new RenameEntryCommand(entry.Model, newName));
+
+        _service.UpdateEntryName(index, newName);
     }
-    
+
     public void AddSynonym(DanceSynonymEntryViewModel entry, string synonym)
     {
         // Check for empty
         if (string.IsNullOrWhiteSpace(synonym))
         {
-            _service.NotificationService?.ShowNotification("Synonym cannot be empty", NotificationSeverity.Warning);
+            _notificationService?.ShowNotification("Synonym cannot be empty", NotificationSeverity.Warning);
             return;
         }
-        
+
         // Check for duplicates across all entries
         if (_service.IsDuplicate(synonym))
         {
-            _service.NotificationService?.ShowNotification("This synonym already exists", NotificationSeverity.Warning);
+            _notificationService?.ShowNotification("This synonym already exists", NotificationSeverity.Warning);
             return;
         }
-        
-        _service.ExecuteCommand(new AddSynonymCommand(entry.Model, synonym));
+
+        var index = Entries.IndexOf(entry);
+        if (index >= 0)
+        {
+            _service.AddSynonymToEntry(index, synonym);
+        }
     }
-    
+
     public void RemoveSynonym(DanceSynonymEntryViewModel entry, string synonym)
     {
-        _service.ExecuteCommand(new RemoveSynonymCommand(entry.Model, synonym));
+        var index = Entries.IndexOf(entry);
+        if (index >= 0)
+        {
+            _service.RemoveSynonymFromEntry(index, synonym);
+        }
     }
-    
+
     [RelayCommand(CanExecute = nameof(CanUndo))]
     private void Undo()
     {
         _service.Undo();
     }
-    
+
     [RelayCommand(CanExecute = nameof(CanRedo))]
     private void Redo()
     {
         _service.Redo();
     }
-    
+
     [RelayCommand]
     private void Import()
     {
         ImportRequested?.Invoke(this, EventArgs.Empty);
     }
-    
+
     [RelayCommand]
     private void Export()
     {
         ExportRequested?.Invoke(this, EventArgs.Empty);
     }
-    
+
     /// <summary>
     /// Called by View after import file is selected and user confirms overwrite.
     /// </summary>
@@ -286,7 +294,7 @@ public partial class DanceSynonymEditorViewModel : ViewModelBase
     {
         _service.Import(filePath);
     }
-    
+
     /// <summary>
     /// Called by View after export file is selected.
     /// </summary>
@@ -294,7 +302,7 @@ public partial class DanceSynonymEditorViewModel : ViewModelBase
     {
         _service.Export(filePath);
     }
-    
+
     public void Dispose()
     {
         _service.DataChanged -= OnDataChanged;

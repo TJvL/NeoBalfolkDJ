@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Input;
+using NeoBalfolkDJ.Helpers;
 using NeoBalfolkDJ.ViewModels;
 
 namespace NeoBalfolkDJ.Views;
@@ -11,11 +12,14 @@ public partial class NotificationView : UserControl
         InitializeComponent();
     }
 
-    private async void OnPointerPressed(object? sender, PointerPressedEventArgs e)
+    private void OnPointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (DataContext is NotificationViewModel viewModel)
+        AsyncHelper.SafeFireAndForget(async () =>
         {
-            await viewModel.CloseNotification();
-        }
+            if (DataContext is NotificationViewModel viewModel)
+            {
+                await viewModel.CloseNotification();
+            }
+        });
     }
 }

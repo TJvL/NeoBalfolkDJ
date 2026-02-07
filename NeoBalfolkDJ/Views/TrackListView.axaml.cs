@@ -3,7 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
-using Avalonia.VisualTree;
+using NeoBalfolkDJ.Helpers;
 using NeoBalfolkDJ.Models;
 using NeoBalfolkDJ.ViewModels;
 
@@ -17,7 +17,7 @@ public partial class TrackListView : UserControl
     public TrackListView()
     {
         InitializeComponent();
-        
+
         // Subscribe to ViewModel events when DataContext changes
         DataContextChanged += (_, _) =>
         {
@@ -31,119 +31,135 @@ public partial class TrackListView : UserControl
             }
         };
     }
-    
-    private async void OnImportDanceTreeRequested(object? sender, System.EventArgs e)
+
+    private void OnImportDanceTreeRequested(object? sender, System.EventArgs e)
     {
-        var topLevel = TopLevel.GetTopLevel(this);
-        if (topLevel == null) return;
-        
-        // Show confirmation dialog first
-        var confirmDialog = new ConfirmationDialog();
-        confirmDialog.Setup("Import Dance Tree", 
-            "Importing will permanently overwrite the currently loaded dance tree.\n\n" +
-            "Make sure you have exported a backup if needed.\n\n" +
-            "Do you want to continue?");
-        
-        await confirmDialog.ShowDialog((Window)topLevel);
-        
-        if (!confirmDialog.IsConfirmed) return;
-        
-        var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
-        {
-            Title = "Import Dance Tree",
-            AllowMultiple = false,
-            FileTypeFilter = new List<FilePickerFileType>
-            {
-                new("JSON Files") { Patterns = new[] { "*.json" } },
-                new("All Files") { Patterns = new[] { "*" } }
-            }
-        });
-        
-        if (files.Count > 0 && DataContext is TrackListViewModel viewModel)
-        {
-            var filePath = files[0].Path.LocalPath;
-            viewModel.ImportDanceTree(filePath);
-        }
-    }
-    
-    private async void OnExportDanceTreeRequested(object? sender, System.EventArgs e)
-    {
-        var topLevel = TopLevel.GetTopLevel(this);
-        if (topLevel == null) return;
-        
-        var file = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
-        {
-            Title = "Export Dance Tree",
-            SuggestedFileName = "dancetree.json",
-            DefaultExtension = "json",
-            FileTypeChoices = new List<FilePickerFileType>
-            {
-                new("JSON Files") { Patterns = new[] { "*.json" } }
-            }
-        });
-        
-        if (file != null && DataContext is TrackListViewModel viewModel)
-        {
-            var filePath = file.Path.LocalPath;
-            viewModel.ExportDanceTree(filePath);
-        }
-    }
-    
-    private async void OnAddCategoryRequested(object? sender, System.EventArgs e)
-    {
-        var topLevel = TopLevel.GetTopLevel(this);
-        if (topLevel == null) return;
-        
-        var dialog = new AddDanceItemDialog();
-        dialog.SetupForCategory();
-        
-        await dialog.ShowDialog((Window)topLevel);
-        
-        if (dialog.IsConfirmed && dialog.ResultName != null && DataContext is TrackListViewModel viewModel)
-        {
-            viewModel.AddCategory(dialog.ResultName, dialog.ResultWeight);
-        }
-    }
-    
-    private async void OnAddDanceRequested(object? sender, System.EventArgs e)
-    {
-        var topLevel = TopLevel.GetTopLevel(this);
-        if (topLevel == null) return;
-        
-        var dialog = new AddDanceItemDialog();
-        dialog.SetupForDance();
-        
-        await dialog.ShowDialog((Window)topLevel);
-        
-        if (dialog.IsConfirmed && dialog.ResultName != null && DataContext is TrackListViewModel viewModel)
-        {
-            viewModel.AddDance(dialog.ResultName, dialog.ResultWeight);
-        }
-    }
-    
-    private async void OnDeleteItemRequested(object? sender, (object Item, DanceCategoryNode Parent) args)
-    {
-        if (DataContext is not TrackListViewModel viewModel)
-            return;
-            
-        // Check if confirmation is required
-        if (viewModel.RequiresDeleteConfirmation(args.Item))
+        AsyncHelper.SafeFireAndForget(async () =>
         {
             var topLevel = TopLevel.GetTopLevel(this);
             if (topLevel == null) return;
-            
-            var dialog = new ConfirmDeleteDialog();
-            dialog.SetMessage(viewModel.GetDeleteDescription(args.Item));
-            
-            await dialog.ShowDialog((Window)topLevel);
-            
-            if (!dialog.IsConfirmed)
-                return;
-        }
-        
-        viewModel.DeleteItem(args.Item, args.Parent);
+
+            // Show confirmation dialog first
+            var confirmDialog = new ConfirmationDialog();
+            confirmDialog.Setup("Import Dance Tree",
+                "Importing will permanently overwrite the currently loaded dance tree.\n\n" +
+                "Make sure you have exported a backup if needed.\n\n" +
+                "Do you want to continue?");
+
+            await confirmDialog.ShowDialog((Window)topLevel);
+
+            if (!confirmDialog.IsConfirmed) return;
+
+            var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                Title = "Import Dance Tree",
+                AllowMultiple = false,
+                FileTypeFilter = new List<FilePickerFileType>
+                {
+                    new("JSON Files") { Patterns = ["*.json"] },
+                    new("All Files") { Patterns = ["*"] }
+                }
+            });
+
+            if (files.Count > 0 && DataContext is TrackListViewModel viewModel)
+            {
+                var filePath = files[0].Path.LocalPath;
+                viewModel.ImportDanceTree(filePath);
+            }
+        }, userFriendlyError: "Failed to import dance tree");
     }
-    
+
+    private void OnExportDanceTreeRequested(object? sender, System.EventArgs e)
+    {
+        AsyncHelper.SafeFireAndForget(async () =>
+        {
+            var topLevel = TopLevel.GetTopLevel(this);
+            if (topLevel == null) return;
+
+            var file = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+            {
+                Title = "Export Dance Tree",
+                // ReSharper disable once StringLiteralTypo
+                SuggestedFileName = "dancetree.json",
+                DefaultExtension = "json",
+                FileTypeChoices = new List<FilePickerFileType>
+                {
+                    new("JSON Files") { Patterns = ["*.json"] }
+                }
+            });
+
+            if (file != null && DataContext is TrackListViewModel viewModel)
+            {
+                var filePath = file.Path.LocalPath;
+                viewModel.ExportDanceTree(filePath);
+            }
+        }, userFriendlyError: "Failed to export dance tree");
+    }
+
+    private void OnAddCategoryRequested(object? sender, System.EventArgs e)
+    {
+        AsyncHelper.SafeFireAndForget(async () =>
+        {
+            var topLevel = TopLevel.GetTopLevel(this);
+            if (topLevel == null) return;
+
+            var dialog = new AddDanceItemDialog();
+            dialog.SetupForCategory();
+
+            await dialog.ShowDialog((Window)topLevel);
+
+            if (dialog is { IsConfirmed: true, ResultName: not null } && DataContext is TrackListViewModel viewModel)
+            {
+                viewModel.AddCategory(dialog.ResultName, dialog.ResultWeight);
+            }
+        });
+    }
+
+    private void OnAddDanceRequested(object? sender, System.EventArgs e)
+    {
+        AsyncHelper.SafeFireAndForget(async () =>
+        {
+            var topLevel = TopLevel.GetTopLevel(this);
+            if (topLevel == null) return;
+
+            var dialog = new AddDanceItemDialog();
+            dialog.SetupForDance();
+
+            await dialog.ShowDialog((Window)topLevel);
+
+            if (dialog is { IsConfirmed: true, ResultName: not null } && DataContext is TrackListViewModel viewModel)
+            {
+                viewModel.AddDance(dialog.ResultName, dialog.ResultWeight);
+            }
+        });
+    }
+
+    private void OnDeleteItemRequested(object? sender, (object Item, DanceCategoryNode Parent) args)
+    {
+        AsyncHelper.SafeFireAndForget(async () =>
+        {
+            if (DataContext is not TrackListViewModel viewModel)
+                return;
+
+            // Check if confirmation is required
+            if (viewModel.RequiresDeleteConfirmation(args.Item))
+            {
+                var topLevel = TopLevel.GetTopLevel(this);
+                if (topLevel == null) return;
+
+                var dialog = new ConfirmDeleteDialog();
+                dialog.SetMessage(viewModel.GetDeleteDescription(args.Item));
+
+                await dialog.ShowDialog((Window)topLevel);
+
+                if (!dialog.IsConfirmed)
+                    return;
+            }
+
+            viewModel.DeleteItem(args.Item, args.Parent);
+        });
+    }
+
     private void OnAddCategoryClick(object? sender, RoutedEventArgs e)
     {
         if (DataContext is TrackListViewModel viewModel)
@@ -151,7 +167,7 @@ public partial class TrackListView : UserControl
             viewModel.RequestAddCategoryCommand.Execute(null);
         }
     }
-    
+
     private void OnAddDanceClick(object? sender, RoutedEventArgs e)
     {
         if (DataContext is TrackListViewModel viewModel)
@@ -159,7 +175,7 @@ public partial class TrackListView : UserControl
             viewModel.RequestAddDanceCommand.Execute(null);
         }
     }
-    
+
     private void OnDeleteClick(object? sender, RoutedEventArgs e)
     {
         if (DataContext is TrackListViewModel viewModel)
@@ -170,8 +186,7 @@ public partial class TrackListView : UserControl
 
     private void DataGrid_DoubleTapped(object? sender, TappedEventArgs e)
     {
-        if (sender is DataGrid dataGrid && 
-            dataGrid.SelectedItem is Track track &&
+        if (sender is DataGrid { SelectedItem: Track track } &&
             DataContext is TrackListViewModel viewModel)
         {
             viewModel.OnTrackDoubleClicked(track);
@@ -203,7 +218,7 @@ public partial class TrackListView : UserControl
             e.Handled = true;
             _clickCount = 0;
             _lastSortColumn = null;
-            
+
             // Clear sort descriptions
             dataGrid.CollectionView?.SortDescriptions.Clear();
         }

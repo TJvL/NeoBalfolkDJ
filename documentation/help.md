@@ -2,18 +2,6 @@
 
 Welcome to the NeoBalfolkDJ documentation. This guide will help you get started and make the most of the application for your Balfolk dance nights.
 
-## Table of Contents
-
-1. [Getting Started](#getting-started)
-2. [Main Interface](#main-interface)
-3. [Track List](#track-list)
-4. [Dance Tree](#dance-tree)
-5. [Queue Management](#queue-management)
-6. [Playback Controls](#playback-controls)
-7. [Presentation Displays](#presentation-displays)
-8. [Settings](#settings)
-9. [Tips for DJs](#tips-for-djs)
-
 ---
 
 ## Getting Started

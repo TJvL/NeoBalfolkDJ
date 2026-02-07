@@ -5,25 +5,33 @@ using NeoBalfolkDJ.Models;
 
 namespace NeoBalfolkDJ.Services;
 
-public static class MusicScannerService
+/// <summary>
+/// Service for scanning directories for music files.
+/// </summary>
+public sealed class MusicScannerService(ILoggingService logger) : IMusicScannerService, IDisposable
 {
+    private readonly ILoggingService _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private bool _disposed;
+
     /// <summary>
     /// Scans a directory recursively for .mp3 files and parses track information from filenames.
     /// Expected filename pattern: "{dance} - {artist} - {title}.mp3"
     /// </summary>
     /// <param name="directoryPath">The root directory to scan</param>
     /// <returns>A list of Track objects parsed from the found files</returns>
-    public static List<Track> ScanDirectory(string directoryPath)
+    public List<Track> ScanDirectory(string directoryPath)
     {
         var tracks = new List<Track>();
 
+        if (_disposed) return tracks;
+
         if (string.IsNullOrWhiteSpace(directoryPath) || !Directory.Exists(directoryPath))
         {
-            LoggingService.Warning($"Music directory does not exist or is empty: {directoryPath}");
+            _logger.Warning($"Music directory does not exist or is empty: {directoryPath}");
             return tracks;
         }
 
-        LoggingService.Info($"Scanning music directory: {directoryPath}");
+        _logger.Info($"Scanning music directory: {directoryPath}");
 
         try
         {
@@ -43,11 +51,11 @@ public static class MusicScannerService
                 }
             }
 
-            LoggingService.Info($"Scan complete: {tracks.Count} tracks found, {skippedCount} files skipped");
+            _logger.Info($"Scan complete: {tracks.Count} tracks found, {skippedCount} files skipped");
         }
         catch (Exception ex)
         {
-            LoggingService.Error("Error scanning music directory", ex);
+            _logger.Error("Error scanning music directory", ex);
         }
 
         return tracks;
@@ -59,15 +67,15 @@ public static class MusicScannerService
     /// </summary>
     /// <param name="filePath">The full path to the MP3 file</param>
     /// <returns>A Track object if parsing succeeds, null otherwise</returns>
-    private static Track? ParseTrackFromFilePath(string filePath)
+    private Track? ParseTrackFromFilePath(string filePath)
     {
         try
         {
             var fileName = Path.GetFileNameWithoutExtension(filePath);
-            
+
             // Split by " - " (space-dash-space)
             var parts = fileName.Split(" - ");
-            
+
             // We need exactly 3 parts: dance, artist, title
             if (parts.Length != 3)
             {
@@ -79,8 +87,8 @@ public static class MusicScannerService
             var title = parts[2].Trim();
 
             // Validate that none of the parts are empty
-            if (string.IsNullOrWhiteSpace(dance) || 
-                string.IsNullOrWhiteSpace(artist) || 
+            if (string.IsNullOrWhiteSpace(dance) ||
+                string.IsNullOrWhiteSpace(artist) ||
                 string.IsNullOrWhiteSpace(title))
             {
                 return null;
@@ -89,14 +97,7 @@ public static class MusicScannerService
             // Read track duration using TagLib
             var duration = GetTrackDuration(filePath);
 
-            return new Track
-            {
-                Dance = dance,
-                Artist = artist,
-                Title = title,
-                FilePath = filePath,
-                Length = duration
-            };
+            return new Track(dance, artist, title, duration, filePath);
         }
         catch (Exception)
         {
@@ -109,7 +110,7 @@ public static class MusicScannerService
     /// </summary>
     /// <param name="filePath">The path to the audio file</param>
     /// <returns>The duration of the track, or TimeSpan.Zero if it cannot be read</returns>
-    private static TimeSpan GetTrackDuration(string filePath)
+    private TimeSpan GetTrackDuration(string filePath)
     {
         try
         {
@@ -118,8 +119,15 @@ public static class MusicScannerService
         }
         catch (Exception ex)
         {
-            LoggingService.Warning($"Failed to read duration for {Path.GetFileName(filePath)}: {ex.Message}");
+            _logger.Warning($"Failed to read duration for {Path.GetFileName(filePath)}: {ex.Message}");
             return TimeSpan.Zero;
         }
+    }
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+
+        _disposed = true;
     }
 }

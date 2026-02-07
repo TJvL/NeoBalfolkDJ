@@ -5,5 +5,6 @@ public enum LoggingLevel
     Debug,
     Info,
     Warning,
-    Error
+    Error,
+    Critical
 }

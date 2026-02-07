@@ -1,33 +1,46 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.ComponentModel;
+using System.Threading.Tasks;
+using Avalonia.Controls;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
+using NeoBalfolkDJ.Helpers;
+using NeoBalfolkDJ.Messaging;
+using NeoBalfolkDJ.Messaging.Commands;
+using NeoBalfolkDJ.Messaging.Events;
 using NeoBalfolkDJ.Models;
 using NeoBalfolkDJ.Services;
 
 namespace NeoBalfolkDJ.ViewModels;
 
-public partial class MainWindowViewModel : ViewModelBase
+public sealed partial class MainWindowViewModel : ViewModelBase, IDisposable
 {
-    public TrackStoreService TrackStore { get; } = new();
-    public TrackPreloadService PreloadService { get; } = new();
-    public SessionTrackHistoryService SessionHistory { get; } = new();
-    public TrackListViewModel TrackList { get; } = new();
-    public SettingsViewModel Settings { get; } = new();
-    public PlaybackViewModel Playback { get; } = new();
-    public QueueViewModel Queue { get; } = new();
-    public ToolbarViewModel Toolbar { get; } = new();
-    public NotificationViewModel Notification { get; } = new();
-    public HelpViewModel Help { get; } = new();
-    public NotificationService NotificationService { get; } = new();
-    public DanceCategoryService DanceCategoryService { get; }
-    public DanceSynonymService DanceSynonymService { get; }
-    public WeightedRandomService WeightedRandomService { get; }
-    
-    private PresentationDisplayService? _presentationService;
+    private readonly ILoggingService _logger;
+    private readonly ICommandBus _commandBus;
+    private readonly IEventAggregator _eventAggregator;
+    private readonly List<IDisposable> _subscriptions = [];
+
+    private ITrackStoreService TrackStore { get; }
+    private ITrackPreloadService PreloadService { get; }
+    private ISessionTrackHistoryService SessionHistory { get; }
+    public TrackListViewModel TrackList { get; }
+    public SettingsViewModel Settings { get; }
+    public PlaybackViewModel Playback { get; }
+    public QueueViewModel Queue { get; }
+    public ToolbarViewModel Toolbar { get; }
+    public NotificationViewModel Notification { get; }
+    public HelpViewModel Help { get; }
+    private INotificationService NotificationService { get; }
+    private IDanceCategoryService DanceCategoryService { get; }
+    private IDanceSynonymService DanceSynonymService { get; }
+    private IWeightedRandomService WeightedRandomService { get; }
+
+    private IPresentationDisplayService? _presentationService;
     private bool _autoQueueEnabled;
     private bool _allowDuplicates;
+    private bool _disposed;
 
     /// <summary>
     /// Event raised when exit is requested
@@ -38,66 +51,95 @@ public partial class MainWindowViewModel : ViewModelBase
     /// Event raised when history export is requested (MainWindow handles the file dialog)
     /// </summary>
     public event EventHandler? ExportHistoryRequested;
-    
+
     [ObservableProperty]
     private ViewModelBase _currentView;
-    
+
     [ObservableProperty]
     private bool _isSettingsVisible;
-    
+
     [ObservableProperty]
     private bool _isHelpVisible;
-    
-    public MainWindowViewModel()
+
+    /// <summary>
+    /// Design-time constructor
+    /// </summary>
+    public MainWindowViewModel() : this(null!, null!, null!, null!, null!, null!, null!, null!, null!, null!, null!, null!, null!, null!, null!, null!, null!, null!)
     {
+        if (Design.IsDesignMode)
+        {
+            // Design-time initialization handled by child ViewModels
+        }
+    }
+
+    public MainWindowViewModel(
+        ILoggingService logger,
+        ISettingsService settingsService,
+        ITrackStoreService trackStore,
+        ITrackPreloadService preloadService,
+        ISessionTrackHistoryService sessionHistory,
+        INotificationService notificationService,
+        IDanceCategoryService danceCategoryService,
+        IDanceSynonymService danceSynonymService,
+        IWeightedRandomService weightedRandomService,
+        ICommandBus commandBus,
+        IEventAggregator eventAggregator,
+        TrackListViewModel trackList,
+        SettingsViewModel settings,
+        PlaybackViewModel playback,
+        QueueViewModel queue,
+        ToolbarViewModel toolbar,
+        NotificationViewModel notification,
+        HelpViewModel help)
+    {
+        _ = settingsService; // Injected by DI, used by child ViewModels
+        _logger = logger;
+        _commandBus = commandBus;
+        _eventAggregator = eventAggregator;
+        TrackStore = trackStore;
+        PreloadService = preloadService;
+        SessionHistory = sessionHistory;
+        NotificationService = notificationService;
+        DanceCategoryService = danceCategoryService;
+        DanceSynonymService = danceSynonymService;
+        WeightedRandomService = weightedRandomService;
+        TrackList = trackList;
+        Settings = settings;
+        Playback = playback;
+        Queue = queue;
+        Toolbar = toolbar;
+        Notification = notification;
+        Help = help;
+
         _currentView = TrackList;
         _autoQueueEnabled = Settings.AutoQueueRandomTrack;
         _allowDuplicates = Settings.AllowDuplicateTracksInQueue;
-        
-        // Initialize DanceCategoryService with NotificationService
-        DanceCategoryService = new DanceCategoryService(NotificationService);
-        
-        // Initialize DanceSynonymService with NotificationService
-        DanceSynonymService = new DanceSynonymService(NotificationService);
+
+        // Load synonyms
         DanceSynonymService.Load();
-        
-        // Initialize WeightedRandomService
-        WeightedRandomService = new WeightedRandomService(DanceCategoryService, DanceSynonymService, NotificationService);
-        
+
         // Wire up TrackStore to ViewModels
         TrackList.SetTrackStore(TrackStore);
         TrackList.SetDanceCategoryService(DanceCategoryService);
-        Toolbar.SetTrackStore(TrackStore);
         Queue.SetSessionHistory(SessionHistory);
-        
+
         // Wire up DanceSynonymService to Settings
         Settings.SetSynonymService(DanceSynonymService);
-        
+
         // Wire up NotificationService to child view models
         Queue.NotificationService = NotificationService;
-        Toolbar.NotificationService = NotificationService;
-        
-        // Wire up toolbar events
-        Toolbar.SettingsRequested += (_, _) => ShowSettings();
-        Toolbar.HelpRequested += (_, _) => ShowHelp();
+
+        // Register command handlers
+        RegisterCommandHandlers();
+
+        // Subscribe to events from the event aggregator
+        SubscribeToEvents();
+
+        // Wire up toolbar exit event (still needed for window close)
         Toolbar.ExitRequested += (_, _) => ExitRequested?.Invoke(this, EventArgs.Empty);
-        Toolbar.TrackAddRequested += (_, track) => Queue.AddTrack(track);
-        Toolbar.ShuffleRequested += OnShuffleRequested;
-        Toolbar.StopMarkerRequested += (_, _) => Queue.AddStopMarker();
-        Toolbar.DelayMarkerRequested += (_, _) => Queue.AddDelayMarker();
-        Toolbar.MessageMarkerAddRequested += (_, args) => Queue.AddMessageMarker(args.message, args.delaySeconds);
-        Toolbar.RemoveSelectedRequested += (_, _) => Queue.RemoveSelectedItem();
-        Toolbar.ClearQueueRequested += (_, _) => Queue.ClearQueue();
         Toolbar.ExportHistoryRequested += (_, _) => ExportHistoryRequested?.Invoke(this, EventArgs.Empty);
-        Toolbar.ClearHistoryRequested += (_, _) => ClearHistory();
-        
-        // Wire up queue history mode to toolbar
-        Queue.HistoryModeChanged += (_, isHistoryMode) => Toolbar.IsHistoryMode = isHistoryMode;
-        
-        // Wire up queue refresh auto-queued track event
-        Queue.RefreshAutoQueuedTrackRequested += OnRefreshAutoQueuedTrackRequested;
-        
-        // Wire up other events
+
+        // Wire up other events (settings-related, still needed)
         Settings.BackRequested += (_, _) => HideSettings();
         Help.BackRequested += (_, _) => HideHelp();
         Settings.MusicDirectoryChanged += OnMusicDirectoryChanged;
@@ -107,39 +149,137 @@ public partial class MainWindowViewModel : ViewModelBase
         Settings.AutoQueueRandomTrackChanged += OnAutoQueueRandomTrackChanged;
         Settings.AllowDuplicateTracksInQueueChanged += OnAllowDuplicatesChanged;
         Settings.ThemeChanged += OnThemeChanged;
-        TrackList.TrackDoubleClicked += OnTrackDoubleClicked;
         NotificationService.NotificationRequested += OnNotificationRequested;
         TrackStore.TracksReloaded += OnTracksReloaded;
-        
+
         // Wire up playback orchestration
         Queue.QueuedItems.CollectionChanged += OnQueueCollectionChanged;
-        Queue.FirstItemChanged += OnFirstItemChanged;
-        Playback.PlaybackStartRequested += OnPlaybackStartRequested;
-        Playback.NextTrackRequested += OnNextTrackRequested;
-        Playback.TrackFinished += OnTrackFinished;
-        Playback.TrackCleared += OnTrackCleared;
         Playback.PropertyChanged += OnPlaybackPropertyChanged;
-        
+
         // Initialize playback button state based on queue
         Playback.QueueHasItems = Queue.HasItems;
-        
+
         // Load tracks from configured directory on startup
         LoadTracksFromSettings();
     }
 
-    private void OnTrackCleared(object? sender, EventArgs e)
+    private void RegisterCommandHandlers()
     {
-        // Track was cleared (user cleared or programmatically) - clear the currently playing track reference
-        Queue.SetCurrentlyPlayingTrack(null);
+        // Register all command handlers
+        _subscriptions.Add(_commandBus.RegisterHandler<ShowSettingsCommand>(_ =>
+        {
+            ShowSettings();
+            return Task.CompletedTask;
+        }));
+
+        _subscriptions.Add(_commandBus.RegisterHandler<ShowHelpCommand>(_ =>
+        {
+            ShowHelp();
+            return Task.CompletedTask;
+        }));
+
+        _subscriptions.Add(_commandBus.RegisterHandler<AddTrackToQueueCommand>(cmd =>
+        {
+            Queue.AddTrack(cmd.Track);
+            return Task.CompletedTask;
+        }));
+
+        _subscriptions.Add(_commandBus.RegisterHandler<AddStopMarkerCommand>(_ =>
+        {
+            Queue.AddStopMarker();
+            return Task.CompletedTask;
+        }));
+
+        _subscriptions.Add(_commandBus.RegisterHandler<AddDelayMarkerCommand>(_ =>
+        {
+            Queue.AddDelayMarker();
+            return Task.CompletedTask;
+        }));
+
+        _subscriptions.Add(_commandBus.RegisterHandler<AddMessageMarkerCommand>(cmd =>
+        {
+            Queue.AddMessageMarker(cmd.Message, cmd.DelaySeconds);
+            return Task.CompletedTask;
+        }));
+
+        _subscriptions.Add(_commandBus.RegisterHandler<ClearQueueCommand>(_ =>
+        {
+            Queue.ClearQueue();
+            return Task.CompletedTask;
+        }));
+
+        _subscriptions.Add(_commandBus.RegisterHandler<RemoveSelectedQueueItemCommand>(_ =>
+        {
+            Queue.RemoveSelectedItem();
+            return Task.CompletedTask;
+        }));
+
+        _subscriptions.Add(_commandBus.RegisterHandler<ClearHistoryCommand>(_ =>
+        {
+            ClearHistory();
+            return Task.CompletedTask;
+        }));
+
+        _subscriptions.Add(_commandBus.RegisterHandler<RefreshAutoQueueCommand>(_ =>
+        {
+            TryAutoQueueRandomTrack();
+            return Task.CompletedTask;
+        }));
+
+        _subscriptions.Add(_commandBus.RegisterHandler<PlayNextTrackCommand>(_ =>
+        {
+            // Cancel any running delay
+            _delayCancellation?.Cancel();
+            return PlayNextFromQueue();
+        }));
     }
 
-    private void OnTrackFinished(object? sender, EventArgs e)
+    private void SubscribeToEvents()
     {
-        // Track finished playing naturally - add to session history
-        if (Playback.CurrentTrack != null)
+        // Subscribe to track events
+        _subscriptions.Add(_eventAggregator.Subscribe<TrackStartedEvent>(evt =>
         {
-            SessionHistory.AddPlayedTrack(Playback.CurrentTrack);
-        }
+            // Update presentation display
+            _presentationService?.UpdateCurrentTrack(evt.Track);
+        }));
+
+        _subscriptions.Add(_eventAggregator.Subscribe<TrackFinishedEvent>(evt =>
+        {
+            // Track finished playing naturally - add to session history
+            SessionHistory.AddPlayedTrack(evt.Track);
+        }));
+
+        _subscriptions.Add(_eventAggregator.Subscribe<TrackAddedToQueueEvent>(evt =>
+        {
+            // Preload the track if it's the first item
+            if (Queue.PeekFirst() is Track firstTrack && firstTrack.Equals(evt.Track))
+            {
+                AsyncHelper.SafeFireAndForget(async () =>
+                {
+                    if (!PreloadService.IsCached(evt.Track))
+                    {
+                        await PreloadService.PreloadAsync(evt.Track);
+                    }
+                });
+            }
+        }));
+
+        _subscriptions.Add(_eventAggregator.Subscribe<QueueClearedEvent>(_ =>
+        {
+            _presentationService?.Clear();
+        }));
+
+        _subscriptions.Add(_eventAggregator.Subscribe<HistoryModeChangedEvent>(evt =>
+        {
+            // Sync history mode state to toolbar
+            Toolbar.IsHistoryMode = evt.IsHistoryMode;
+        }));
+
+        _subscriptions.Add(_eventAggregator.Subscribe<QueueFirstItemChangedEvent>(evt =>
+        {
+            // Handle first item changes - preload tracks, update presentation "up next"
+            OnFirstItemChanged(evt.FirstItem);
+        }));
     }
 
     private void OnAllowDuplicatesChanged(object? sender, bool allow)
@@ -148,7 +288,7 @@ public partial class MainWindowViewModel : ViewModelBase
         Queue.UpdateAllowDuplicates(allow);
     }
 
-    private void OnThemeChanged(object? sender, AppTheme theme)
+    private static void OnThemeChanged(object? sender, AppTheme theme)
     {
         if (Avalonia.Application.Current is App app)
         {
@@ -159,7 +299,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private void OnAutoQueueRandomTrackChanged(object? sender, bool enabled)
     {
         _autoQueueEnabled = enabled;
-        
+
         // If disabled, remove any auto-queued items
         if (!enabled)
         {
@@ -181,40 +321,12 @@ public partial class MainWindowViewModel : ViewModelBase
         // Use weighted random selection from the dance tree
         Func<Track, bool>? excludeFilter = _allowDuplicates ? null : track => Queue.IsTrackDuplicate(track);
         var randomTrack = WeightedRandomService.SelectRandomTrack(excludeFilter);
-        
+
         if (randomTrack != null)
         {
             Queue.AddAutoQueuedTrack(randomTrack);
         }
         // If null, WeightedRandomService already showed a warning notification
-    }
-
-    private void OnRefreshAutoQueuedTrackRequested(object? sender, AutoQueuedTrack autoQueued)
-    {
-        // Create filter that excludes the current auto-queued track AND applies normal duplicate rules
-        Func<Track, bool> excludeFilter = track =>
-        {
-            // Always exclude the current auto-queued track being replaced
-            if (track.Equals(autoQueued.Track))
-                return true;
-            
-            // Apply normal duplicate rules if duplicates are not allowed
-            if (!_allowDuplicates && Queue.IsTrackDuplicate(track))
-                return true;
-            
-            return false;
-        };
-
-        var randomTrack = WeightedRandomService.SelectRandomTrack(excludeFilter);
-        
-        if (randomTrack != null)
-        {
-            Queue.ReplaceAutoQueuedTrack(autoQueued, randomTrack);
-        }
-        else
-        {
-            NotificationService.ShowNotification("No other tracks available for random selection", NotificationSeverity.Warning);
-        }
     }
 
     private void OnDelaySecondsChanged(object? sender, int seconds)
@@ -228,10 +340,10 @@ public partial class MainWindowViewModel : ViewModelBase
     public void SetPresentationService(PresentationDisplayService service)
     {
         _presentationService = service;
-        
+
         // Initialize with current settings
         _presentationService.UpdateDisplayCount(Settings.PresentationDisplayCount);
-        
+
         // Sync current playback state
         if (Playback.IsStopMarkerActive)
         {
@@ -241,7 +353,7 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             _presentationService.UpdateCurrentTrack(Playback.CurrentTrack);
         }
-        
+
         // Sync progress and next item
         _presentationService.UpdateProgress(Playback.Progress, Playback.Duration);
         _presentationService.UpdateNextItem(Queue.PeekFirst());
@@ -251,27 +363,27 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         _presentationService?.UpdateDisplayCount(count);
     }
-    
+
     private void OnPlaybackPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName is nameof(Playback.Progress) or nameof(Playback.Duration))
         {
             var remaining = (long)(Playback.Duration - Playback.Progress);
             Queue.UpdateCurrentTrackRemaining(remaining);
-            
+
             // Update presentation displays
             _presentationService?.UpdateProgress(Playback.Progress, Playback.Duration);
         }
     }
-    
+
     private void OnQueueCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         // Update playback button states based on queue status
         Playback.QueueHasItems = Queue.HasItems;
-        
+
         // Update next item on presentation displays
         _presentationService?.UpdateNextItem(Queue.PeekFirst());
-        
+
         // Try to auto-queue if enabled, playing, and queue has no manual items
         // Use Dispatcher.Post to avoid modifying collection during CollectionChanged event
         if (Playback.IsPlaying && !Queue.HasManualItems)
@@ -279,49 +391,37 @@ public partial class MainWindowViewModel : ViewModelBase
             Dispatcher.UIThread.Post(TryAutoQueueRandomTrack);
         }
     }
-    
-    private async void OnFirstItemChanged(object? sender, IQueueItem? item)
+
+    private void OnFirstItemChanged(IQueueItem? item)
     {
-        // Extract the track from the item (could be Track or AutoQueuedTrack)
-        var track = item switch
+        AsyncHelper.SafeFireAndForget(async () =>
         {
-            AutoQueuedTrack autoQueued => autoQueued.Track,
-            Track t => t,
-            _ => null
-        };
-        
-        // Preload if it's a track
-        if (track != null && !PreloadService.IsCached(track))
-        {
-            var success = await PreloadService.PreloadAsync(track);
-            if (!success)
+            // Extract the track from the item (could be Track or AutoQueuedTrack)
+            var track = item switch
             {
-                LoggingService.Warning($"Failed to preload first track: {track.Artist} - {track.Title}");
+                AutoQueuedTrack autoQueued => autoQueued.Track,
+                Track t => t,
+                _ => null
+            };
+
+            // Preload if it's a track
+            if (track != null && !PreloadService.IsCached(track))
+            {
+                var success = await PreloadService.PreloadAsync(track);
+                if (!success)
+                {
+                    _logger.Warning($"Failed to preload first track: {track.Artist} - {track.Title}");
+                }
             }
-        }
+        });
     }
-    
-    private async void OnPlaybackStartRequested(object? sender, EventArgs e)
-    {
-        // User pressed play with no current track - start playing from queue
-        await PlayNextFromQueue();
-    }
-    
-    private async void OnNextTrackRequested(object? sender, EventArgs e)
-    {
-        // Cancel any running delay
-        _delayCancellation?.Cancel();
-        
-        // Current track ended or user pressed next - play next from queue
-        await PlayNextFromQueue();
-    }
-    
+
     private System.Threading.CancellationTokenSource? _delayCancellation;
-    
-    private async System.Threading.Tasks.Task PlayNextFromQueue()
+
+    private async Task PlayNextFromQueue()
     {
         var item = Queue.DequeueNext();
-        
+
         // Extract the actual track from AutoQueuedTrack if needed
         var actualTrack = item switch
         {
@@ -329,29 +429,29 @@ public partial class MainWindowViewModel : ViewModelBase
             Track track => track,
             _ => null
         };
-        
+
         switch (item)
         {
             case null:
                 // Queue is empty, stop playback and remove auto-queued items
                 await Playback.ClearTrackAsync();
-                PreloadService.ClearAll();
+                PreloadService.Clear();
                 Queue.RemoveAutoQueuedItems();
                 Queue.SetCurrentlyPlayingTrack(null);
                 _presentationService?.Clear();
                 return;
-                
+
             case StopMarker:
                 // Stop marker reached - stop audio and show stop state, wait for user
                 await Playback.StopPlaybackAsync();
                 Playback.ShowStopMarker();
-                PreloadService.ClearAll();
+                PreloadService.Clear();
                 Queue.RemoveAutoQueuedItems();
                 Queue.SetCurrentlyPlayingTrack(null);
                 _presentationService?.ShowStopMarker();
                 _presentationService?.UpdateNextItem(Queue.PeekFirst());
                 return;
-                
+
             case DelayMarker delay:
                 // Delay marker reached - stop audio, show delay state with countdown, then continue
                 await Playback.StopPlaybackAsync();
@@ -359,12 +459,12 @@ public partial class MainWindowViewModel : ViewModelBase
                 _presentationService?.UpdateNextItem(Queue.PeekFirst());
                 await RunDelayAsync(delay);
                 return;
-                
+
             case MessageMarker message:
                 // Message marker reached - stop audio, show message
                 await Playback.StopPlaybackAsync();
                 Queue.SetCurrentlyPlayingTrack(null);
-                
+
                 if (message.HasDelay)
                 {
                     // Message with delay - show message during countdown, then continue
@@ -376,44 +476,44 @@ public partial class MainWindowViewModel : ViewModelBase
                 {
                     // Message without delay - show message and stop, wait for user
                     Playback.ShowMessageMarker(message.Message);
-                    PreloadService.ClearAll();
+                    PreloadService.Clear();
                     Queue.RemoveAutoQueuedItems();
                     _presentationService?.ShowMessageMarker(message.Message, null);
                     _presentationService?.UpdateNextItem(Queue.PeekFirst());
                 }
                 return;
-                
+
             case AutoQueuedTrack:
             case Track:
                 if (actualTrack == null) return;
-                
+
                 try
                 {
                     // Update currently playing track for duplicate checking
                     Queue.SetCurrentlyPlayingTrack(actualTrack);
-                    
+
                     // Play the track - PlaybackService handles all operations on background thread
                     await Playback.PlayTrackAsync(actualTrack);
                     PreloadService.PromoteNextToCurrent();
                     _presentationService?.UpdateCurrentTrack(actualTrack);
                     _presentationService?.UpdateNextItem(Queue.PeekFirst());
-                    
+
                     // Auto-queue a random track if enabled and no manual items in queue
                     TryAutoQueueRandomTrack();
                 }
                 catch (Exception ex)
                 {
-                    LoggingService.Error($"Failed to play track: {actualTrack.FilePath}", ex);
+                    _logger.Error($"Failed to play track: {actualTrack.FilePath}", ex);
                     NotificationService.ShowNotification("Failed to load track", NotificationSeverity.Error);
-                    
+
                     // Clear currently playing since it failed
                     Queue.SetCurrentlyPlayingTrack(null);
-                    
+
                     // Skip to next track
                     await PlayNextFromQueue();
                     return;
                 }
-                
+
                 // Preload the new first item in queue if it's a track
                 var nextItem = Queue.PeekFirst();
                 var nextTrack = nextItem switch
@@ -422,92 +522,95 @@ public partial class MainWindowViewModel : ViewModelBase
                     Track t => t,
                     _ => null
                 };
-                
+
                 if (nextTrack != null && !PreloadService.IsCached(nextTrack))
                 {
                     var success = await PreloadService.PreloadAsync(nextTrack);
                     if (!success)
                     {
-                        LoggingService.Warning($"Failed to preload next track: {nextTrack.Artist} - {nextTrack.Title}");
+                        _logger.Warning($"Failed to preload next track: {nextTrack.Artist} - {nextTrack.Title}");
                     }
                 }
                 break;
         }
     }
-    
-    private async System.Threading.Tasks.Task RunDelayAsync(DelayMarker delay)
+
+    private async Task RunDelayAsync(DelayMarker delay)
     {
-        _delayCancellation?.Cancel();
+        if (_delayCancellation != null) await _delayCancellation.CancelAsync();
         _delayCancellation = new System.Threading.CancellationTokenSource();
         var token = _delayCancellation.Token;
-        
+
         var totalMs = (long)delay.Duration.TotalMilliseconds;
         Playback.ShowDelayMarker(totalMs);
-        
+
         try
         {
             var elapsed = 0L;
             const int intervalMs = 250;
-            
+
             while (elapsed < totalMs && !token.IsCancellationRequested)
             {
-                await System.Threading.Tasks.Task.Delay(intervalMs, token);
+                await Task.Delay(intervalMs, token);
                 elapsed += intervalMs;
                 Playback.UpdateDelayProgress(elapsed, totalMs);
                 _presentationService?.UpdateProgress(elapsed, totalMs);
             }
-            
+
             if (!token.IsCancellationRequested)
             {
                 // Delay completed, continue to next item
                 await PlayNextFromQueue();
             }
         }
-        catch (System.Threading.Tasks.TaskCanceledException)
+        catch (TaskCanceledException)
         {
-            // Delay was cancelled (user pressed next), handled elsewhere
+            // Delay was canceled (user pressed next), handled elsewhere
         }
     }
-    
-    private async System.Threading.Tasks.Task RunMessageDelayAsync(MessageMarker message)
+
+    private async Task RunMessageDelayAsync(MessageMarker message)
     {
-        _delayCancellation?.Cancel();
+        if (_delayCancellation != null) await _delayCancellation.CancelAsync();
         _delayCancellation = new System.Threading.CancellationTokenSource();
         var token = _delayCancellation.Token;
-        
+
         var totalMs = (long)message.DelayDuration!.Value.TotalMilliseconds;
         Playback.ShowMessageMarker(message.Message, totalMs);
-        
+
         try
         {
             var elapsed = 0L;
             const int intervalMs = 250;
-            
+
             while (elapsed < totalMs && !token.IsCancellationRequested)
             {
-                await System.Threading.Tasks.Task.Delay(intervalMs, token);
+                await Task.Delay(intervalMs, token);
                 elapsed += intervalMs;
                 Playback.UpdateDelayProgress(elapsed, totalMs);
                 _presentationService?.UpdateProgress(elapsed, totalMs);
             }
-            
+
             if (!token.IsCancellationRequested)
             {
                 // Delay completed, continue to next item
                 await PlayNextFromQueue();
             }
         }
-        catch (System.Threading.Tasks.TaskCanceledException)
+        catch (TaskCanceledException)
         {
-            // Delay was cancelled (user pressed next), handled elsewhere
+            // Delay was canceled (user pressed next), handled elsewhere
         }
     }
-    
-    private async void OnNotificationRequested(object? sender, NotificationEventArgs e)
+
+    private void OnNotificationRequested(object? sender, NotificationEventArgs e)
     {
-        await Notification.ShowNotification(e.Message, e.Severity);
+        AsyncHelper.SafeFireAndForget(async () =>
+        {
+            await Notification.ShowNotification(e.Message, e.Severity);
+        });
     }
-    
+
     private void OnTracksReloaded(object? sender, EventArgs e)
     {
         var count = TrackStore.Tracks.Count;
@@ -515,7 +618,7 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             // Assign tracks to dances in the tree
             WeightedRandomService.AssignTracksToTree(TrackStore.Tracks);
-            
+
             NotificationService.ShowNotification($"Loaded {count} tracks", NotificationSeverity.Information);
         }
         else if (!string.IsNullOrWhiteSpace(TrackStore.MusicDirectoryPath))
@@ -523,7 +626,7 @@ public partial class MainWindowViewModel : ViewModelBase
             NotificationService.ShowNotification("No tracks found in music directory", NotificationSeverity.Warning);
         }
     }
-    
+
     private void LoadTracksFromSettings()
     {
         if (!string.IsNullOrWhiteSpace(Settings.MusicDirectoryPath))
@@ -531,23 +634,26 @@ public partial class MainWindowViewModel : ViewModelBase
             TrackStore.SetMusicDirectory(Settings.MusicDirectoryPath);
         }
     }
-    
-    private async void OnMusicDirectoryChanged(object? sender, string newDirectory)
+
+    private void OnMusicDirectoryChanged(object? sender, string newDirectory)
     {
-        // Cancel any running delay
-        _delayCancellation?.Cancel();
-        
-        // Stop playback and clear current track
-        await Playback.ClearTrackAsync();
-        PreloadService.ClearAll();
-        Queue.ClearQueue();
-        Queue.RemoveAutoQueuedItems();
-        Queue.SetCurrentlyPlayingTrack(null);
-        SessionHistory.Clear();
-        _presentationService?.Clear();
-        
-        // Load tracks from new directory
-        TrackStore.SetMusicDirectory(newDirectory);
+        AsyncHelper.SafeFireAndForget(async () =>
+        {
+            // Cancel any running delay
+            if (_delayCancellation != null) await _delayCancellation.CancelAsync();
+
+            // Stop playback and clear current track
+            await Playback.ClearTrackAsync();
+            PreloadService.Clear();
+            Queue.ClearQueue();
+            Queue.RemoveAutoQueuedItems();
+            Queue.SetCurrentlyPlayingTrack(null);
+            SessionHistory.Clear();
+            _presentationService?.Clear();
+
+            // Load tracks from new directory
+            TrackStore.SetMusicDirectory(newDirectory);
+        });
     }
 
     private void OnMaxQueueItemsChanged(object? sender, int maxItems)
@@ -555,31 +661,6 @@ public partial class MainWindowViewModel : ViewModelBase
         Queue.UpdateMaxQueueItems(maxItems);
     }
 
-    private void OnTrackDoubleClicked(object? sender, Track track)
-    {
-        Queue.AddTrack(track);
-    }
-
-    private void OnShuffleRequested(object? sender, EventArgs e)
-    {
-        // Get the selected branch from the dance tree (defaults to root)
-        var selectedNode = TrackList.SelectedDanceNode;
-        if (selectedNode == null)
-        {
-            NotificationService.ShowNotification("No dance category selected", NotificationSeverity.Warning);
-            return;
-        }
-        
-        // Use weighted random selection from the selected branch, respecting duplicate settings
-        Func<Track, bool>? excludeFilter = _allowDuplicates ? null : track => Queue.IsTrackDuplicate(track);
-        var randomTrack = WeightedRandomService.SelectRandomTrackFromBranch(selectedNode, excludeFilter);
-        
-        if (randomTrack != null)
-        {
-            Queue.AddTrack(randomTrack);
-        }
-        // If null, WeightedRandomService already showed a warning notification
-    }
 
     private void ClearHistory()
     {
@@ -590,42 +671,68 @@ public partial class MainWindowViewModel : ViewModelBase
     /// <summary>
     /// Exports the session history to a JSON file
     /// </summary>
-    public async System.Threading.Tasks.Task ExportHistoryAsync(string filePath)
+    public async Task ExportHistoryAsync(string filePath)
     {
         try
         {
-            await SessionHistory.ExportToJsonAsync(filePath);
+            await SessionHistory.ExportToFileAsync(filePath);
             NotificationService.ShowNotification("History exported successfully", NotificationSeverity.Information);
         }
         catch (Exception ex)
         {
-            LoggingService.Error("Failed to export history", ex);
+            _logger.Error("Failed to export history", ex);
             NotificationService.ShowNotification("Failed to export history", NotificationSeverity.Error);
         }
     }
-    
-    public void ShowSettings()
+
+    private void ShowSettings()
     {
         CurrentView = Settings;
         IsSettingsVisible = true;
     }
-    
-    public void HideSettings()
+
+    private void HideSettings()
     {
         CurrentView = TrackList;
         IsSettingsVisible = false;
     }
-    
-    public void ShowHelp()
+
+    private void ShowHelp()
     {
         CurrentView = Help;
         IsHelpVisible = true;
     }
-    
-    public void HideHelp()
+
+    private void HideHelp()
     {
         CurrentView = TrackList;
         IsHelpVisible = false;
+    }
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+
+        // Dispose all command/event subscriptions
+        foreach (var subscription in _subscriptions)
+        {
+            subscription.Dispose();
+        }
+        _subscriptions.Clear();
+
+        // Dispose child ViewModels that implement IDisposable
+        Playback.Dispose();
+
+        // Dispose presentation service
+        (_presentationService as IDisposable)?.Dispose();
+
+        // Dispose delay cancellation token
+        _delayCancellation?.Dispose();
+
+        // Clear event handlers
+        ExitRequested = null;
+        ExportHistoryRequested = null;
     }
 }
 

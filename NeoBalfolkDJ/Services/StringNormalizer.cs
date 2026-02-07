@@ -16,10 +16,10 @@ public static class StringNormalizer
     {
         if (string.IsNullOrWhiteSpace(input))
             return string.Empty;
-        
+
         // Normalize to decomposed form (separates base characters from diacritics)
         var normalized = input.Normalize(NormalizationForm.FormD);
-        
+
         var sb = new StringBuilder();
         foreach (var c in normalized)
         {
@@ -34,11 +34,11 @@ public static class StringNormalizer
                 }
             }
         }
-        
+
         // Normalize whitespace (collapse multiple spaces, trim)
-        return string.Join(" ", sb.ToString().Split(new[] { ' ' }, System.StringSplitOptions.RemoveEmptyEntries));
+        return string.Join(" ", sb.ToString().Split([' '], System.StringSplitOptions.RemoveEmptyEntries));
     }
-    
+
     /// <summary>
     /// Compares two strings for equality after normalization.
     /// </summary>

@@ -3,6 +3,8 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Platform.Storage;
+using Microsoft.Extensions.DependencyInjection;
+using NeoBalfolkDJ.Helpers;
 using NeoBalfolkDJ.Models;
 using NeoBalfolkDJ.Services;
 using NeoBalfolkDJ.ViewModels;
@@ -16,18 +18,25 @@ public partial class MainWindow : Window
     private PixelPoint _lastNormalPosition;
     private Size _lastNormalSize;
 
+    private readonly ILoggingService? _logger;
+    private readonly ISettingsService? _settingsService;
+
     public MainWindow()
     {
         InitializeComponent();
-        
+
+        // Get services from DI
+        _logger = App.Services.GetService<ILoggingService>();
+        _settingsService = App.Services.GetService<ISettingsService>();
+
         // Initialize presentation service after window is loaded
         Opened += OnOpened;
         Closing += OnClosing;
-        
+
         // Track position and size changes for saving
         PositionChanged += OnPositionChanged;
         PropertyChanged += OnPropertyChanged;
-        
+
         // Handle keyboard shortcuts
         KeyDown += OnKeyDown;
     }
@@ -36,12 +45,12 @@ public partial class MainWindow : Window
     {
         if (DataContext is not MainWindowViewModel viewModel)
             return;
-        
+
         // Handle Ctrl+Z (Undo)
-        if (e.Key == Key.Z && e.KeyModifiers == KeyModifiers.Control)
+        if (e is { Key: Key.Z, KeyModifiers: KeyModifiers.Control })
         {
             // If synonym editor is visible, undo there
-            if (viewModel.IsSettingsVisible && viewModel.Settings.IsSynonymEditorVisible)
+            if (viewModel is { IsSettingsVisible: true, Settings.IsSynonymEditorVisible: true })
             {
                 if (viewModel.Settings.SynonymEditor?.CanUndo == true)
                 {
@@ -50,20 +59,17 @@ public partial class MainWindow : Window
                 }
             }
             // If dance tree is visible, undo there
-            else if (!viewModel.IsSettingsVisible && !viewModel.IsHelpVisible && viewModel.TrackList.IsTreeViewMode)
+            else if (viewModel is { IsSettingsVisible: false, IsHelpVisible: false, TrackList: { IsTreeViewMode: true, CanUndo: true } })
             {
-                if (viewModel.TrackList.CanUndo)
-                {
-                    viewModel.TrackList.UndoCommand.Execute(null);
-                    e.Handled = true;
-                }
+                viewModel.TrackList.UndoCommand.Execute(null);
+                e.Handled = true;
             }
         }
         // Handle Ctrl+Shift+Z (Redo)
-        else if (e.Key == Key.Z && e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift))
+        else if (e is { Key: Key.Z, KeyModifiers: (KeyModifiers.Control | KeyModifiers.Shift) })
         {
             // If synonym editor is visible, redo there
-            if (viewModel.IsSettingsVisible && viewModel.Settings.IsSynonymEditorVisible)
+            if (viewModel is { IsSettingsVisible: true, Settings.IsSynonymEditorVisible: true })
             {
                 if (viewModel.Settings.SynonymEditor?.CanRedo == true)
                 {
@@ -72,20 +78,17 @@ public partial class MainWindow : Window
                 }
             }
             // If dance tree is visible, redo there
-            else if (!viewModel.IsSettingsVisible && !viewModel.IsHelpVisible && viewModel.TrackList.IsTreeViewMode)
+            else if (viewModel is { IsSettingsVisible: false, IsHelpVisible: false, TrackList: { IsTreeViewMode: true, CanRedo: true } })
             {
-                if (viewModel.TrackList.CanRedo)
-                {
-                    viewModel.TrackList.RedoCommand.Execute(null);
-                    e.Handled = true;
-                }
+                viewModel.TrackList.RedoCommand.Execute(null);
+                e.Handled = true;
             }
         }
         // Handle Delete key for queue items (not AutoQueuedTrack)
-        else if (e.Key == Key.Delete && e.KeyModifiers == KeyModifiers.None)
+        else if (e is { Key: Key.Delete, KeyModifiers: KeyModifiers.None })
         {
             // Only when main view is visible (not settings, not help) and not in history mode
-            if (!viewModel.IsSettingsVisible && !viewModel.IsHelpVisible && !viewModel.Queue.IsHistoryMode)
+            if (viewModel is { IsSettingsVisible: false, IsHelpVisible: false, Queue.IsHistoryMode: false })
             {
                 // Check if there's a selected item that's not an AutoQueuedTrack
                 if (viewModel.Queue.SelectedItem != null && viewModel.Queue.SelectedItem is not AutoQueuedTrack)
@@ -107,8 +110,8 @@ public partial class MainWindow : Window
                 _lastNormalSize = new Size(Width, Height);
             }
         }
-        
-        // Track window state changes - capture position BEFORE going to maximized
+
+        // Track window state changes - capture position BEFORE going to maximize
         if (e.Property == WindowStateProperty)
         {
             if (WindowState == Avalonia.Controls.WindowState.Normal)
@@ -134,16 +137,17 @@ public partial class MainWindow : Window
 
     private void RestoreWindowState()
     {
-        var settings = SettingsService.Load();
-        
+        if (_settingsService == null) return;
+
+        var settings = _settingsService.Load();
+
         // Check if we have saved state
-        var hasPosition = settings.WindowX.HasValue && settings.WindowY.HasValue &&
+        var hasPosition = settings is { WindowX: not null, WindowY: not null } &&
                           (settings.WindowX.Value != 0 || settings.WindowY.Value != 0 || !settings.IsMaximized);
-        var hasSize = settings.WindowWidth.HasValue && settings.WindowHeight.HasValue &&
-                      settings.WindowWidth.Value > 0 && settings.WindowHeight.Value > 0;
-        
-        LoggingService.Debug($"RestoreWindowState: hasPosition={hasPosition} ({settings.WindowX},{settings.WindowY}), hasSize={hasSize}, isMaximized={settings.IsMaximized}");
-        
+        var hasSize = settings is { WindowWidth: > 0, WindowHeight: > 0 };
+
+        _logger?.Debug($"RestoreWindowState: hasPosition={hasPosition} ({settings.WindowX},{settings.WindowY}), hasSize={hasSize}, isMaximized={settings.IsMaximized}");
+
         // Restore size immediately
         if (hasSize)
         {
@@ -155,35 +159,37 @@ public partial class MainWindow : Window
         {
             _lastNormalSize = new Size(Width, Height);
         }
-        
+
         // Restore position
         if (hasPosition)
         {
             WindowStartupLocation = WindowStartupLocation.Manual;
             Position = new PixelPoint((int)settings.WindowX!.Value, (int)settings.WindowY!.Value);
             _lastNormalPosition = Position;
-            LoggingService.Debug($"Restored window position: {settings.WindowX},{settings.WindowY}");
+            _logger?.Debug($"Restored window position: {settings.WindowX},{settings.WindowY}");
         }
         else
         {
             _lastNormalPosition = Position;
         }
-        
+
         // Restore maximized state after a short delay to ensure position is applied first
         if (settings.IsMaximized)
         {
             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
                 WindowState = Avalonia.Controls.WindowState.Maximized;
-                LoggingService.Debug("Restored window state: Maximized");
+                _logger?.Debug("Restored window state: Maximized");
             }, Avalonia.Threading.DispatcherPriority.Background);
         }
     }
 
     private void SaveWindowState()
     {
-        var settings = SettingsService.Load();
-        
+        if (_settingsService == null) return;
+
+        var settings = _settingsService.Load();
+
         // Save the normal (non-maximized) position and size
         if (WindowState == Avalonia.Controls.WindowState.Normal)
         {
@@ -191,7 +197,7 @@ public partial class MainWindow : Window
             settings.WindowY = Position.Y;
             settings.WindowWidth = Width;
             settings.WindowHeight = Height;
-            LoggingService.Debug($"Saving normal window state: pos=({Position.X},{Position.Y}), size=({Width}x{Height})");
+            _logger?.Debug($"Saving normal window state: pos=({Position.X},{Position.Y}), size=({Width}x{Height})");
         }
         else
         {
@@ -200,51 +206,54 @@ public partial class MainWindow : Window
             settings.WindowY = _lastNormalPosition.Y;
             settings.WindowWidth = _lastNormalSize.Width > 0 ? _lastNormalSize.Width : Width;
             settings.WindowHeight = _lastNormalSize.Height > 0 ? _lastNormalSize.Height : Height;
-            LoggingService.Debug($"Saving maximized window state: lastPos=({_lastNormalPosition.X},{_lastNormalPosition.Y}), lastSize=({_lastNormalSize.Width}x{_lastNormalSize.Height})");
+            _logger?.Debug($"Saving maximized window state: lastPos=({_lastNormalPosition.X},{_lastNormalPosition.Y}), lastSize=({_lastNormalSize.Width}x{_lastNormalSize.Height})");
         }
-        
+
         settings.IsMaximized = WindowState == Avalonia.Controls.WindowState.Maximized;
-        
-        SettingsService.Save(settings);
-        LoggingService.Debug($"Window state saved. IsMaximized={settings.IsMaximized}");
+
+        _settingsService.Save(settings);
+        _logger?.Debug($"Window state saved. IsMaximized={settings.IsMaximized}");
     }
 
     private void OnOpened(object? sender, System.EventArgs e)
     {
         // Restore window state after window is opened (better timing for multi-monitor setups)
         RestoreWindowState();
-        
-        if (DataContext is MainWindowViewModel viewModel)
+
+        if (DataContext is MainWindowViewModel viewModel && _logger != null && _settingsService != null)
         {
-            _presentationService = new PresentationDisplayService(this);
+            _presentationService = new PresentationDisplayService(_logger, _settingsService, this);
             viewModel.SetPresentationService(_presentationService);
             viewModel.ExitRequested += OnExitRequested;
             viewModel.ExportHistoryRequested += OnExportHistoryRequested;
         }
     }
 
-    private async void OnExportHistoryRequested(object? sender, System.EventArgs e)
+    private void OnExportHistoryRequested(object? sender, System.EventArgs e)
     {
-        if (DataContext is not MainWindowViewModel viewModel)
-            return;
-
-        var storageProvider = StorageProvider;
-        
-        var file = await storageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        AsyncHelper.SafeFireAndForget(async () =>
         {
-            Title = "Export History",
-            SuggestedFileName = "track_history.json",
-            FileTypeChoices = new List<FilePickerFileType>
+            if (DataContext is not MainWindowViewModel viewModel)
+                return;
+
+            var storageProvider = StorageProvider;
+
+            var file = await storageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
             {
-                new("JSON Files") { Patterns = new[] { "*.json" } },
-                new("All Files") { Patterns = new[] { "*" } }
-            }
-        });
+                Title = "Export History",
+                SuggestedFileName = "track_history.json",
+                FileTypeChoices = new List<FilePickerFileType>
+                {
+                    new("JSON Files") { Patterns = ["*.json"] },
+                    new("All Files") { Patterns = ["*"] }
+                }
+            });
 
-        if (file != null)
-        {
-            await viewModel.ExportHistoryAsync(file.Path.LocalPath);
-        }
+            if (file != null)
+            {
+                await viewModel.ExportHistoryAsync(file.Path.LocalPath);
+            }
+        }, userFriendlyError: "Failed to export history");
     }
 
     private void OnClosing(object? sender, WindowClosingEventArgs e)
@@ -255,7 +264,7 @@ public partial class MainWindow : Window
             e.Cancel = true;
             return;
         }
-        
+
         // Save window state before closing
         SaveWindowState();
     }
@@ -263,23 +272,23 @@ public partial class MainWindow : Window
     private void OnExitRequested(object? sender, System.EventArgs e)
     {
         _allowClose = true;
-        
+
         // Save main window state before closing
         SaveWindowState();
-        
+
         // Dispose presentation windows (this saves their states and closes them)
         _presentationService?.Dispose();
         _presentationService = null;
-        
+
         // Dispose the PlaybackViewModel to stop audio playback
         if (DataContext is MainWindowViewModel viewModel)
         {
             viewModel.Playback.Dispose();
         }
-        
+
         // Close the main window
         Close();
-        
+
         // Shutdown the application
         if (Application.Current?.ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
         {

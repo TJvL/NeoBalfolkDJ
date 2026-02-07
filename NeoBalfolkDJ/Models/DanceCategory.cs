@@ -10,15 +10,16 @@ namespace NeoBalfolkDJ.Models;
 /// <summary>
 /// Represents a leaf dance item in the dance category tree.
 /// </summary>
-public class DanceItem : INotifyPropertyChanged
+public sealed class DanceItem : INotifyPropertyChanged
 {
     private string _name = string.Empty;
     private int _weight;
-    
+
     [JsonPropertyName("name")]
-    public string Name 
-    { 
+    public string Name
+    {
         get => _name;
+        // ReSharper disable once PropertyCanBeMadeInitOnly.Global
         set
         {
             if (_name != value)
@@ -29,11 +30,12 @@ public class DanceItem : INotifyPropertyChanged
             }
         }
     }
-    
+
     [JsonPropertyName("weight")]
-    public int Weight 
-    { 
+    public int Weight
+    {
         get => _weight;
+        // ReSharper disable once PropertyCanBeMadeInitOnly.Global
         set
         {
             if (_weight != value)
@@ -44,31 +46,31 @@ public class DanceItem : INotifyPropertyChanged
             }
         }
     }
-    
+
     /// <summary>
     /// Tracks assigned to this dance (not serialized).
     /// </summary>
     [JsonIgnore]
     public List<Track> AssignedTracks { get; } = new();
-    
+
     /// <summary>
     /// Number of tracks assigned to this dance.
     /// </summary>
     [JsonIgnore]
     public int TrackCount => AssignedTracks.Count;
-    
+
     /// <summary>
     /// Whether this dance is effectively disabled (weight 0 or no tracks).
     /// </summary>
     [JsonIgnore]
     public bool IsEffectivelyDisabled => Weight == 0 || TrackCount == 0;
-    
+
     /// <summary>
     /// Display name with weight and track count for UI binding.
     /// </summary>
     [JsonIgnore]
     public string DisplayName => $"{Name}  Weight: {Weight} ({TrackCount} tracks)";
-    
+
     /// <summary>
     /// Clears all assigned tracks.
     /// </summary>
@@ -79,7 +81,7 @@ public class DanceItem : INotifyPropertyChanged
         OnPropertyChanged(nameof(DisplayName));
         OnPropertyChanged(nameof(IsEffectivelyDisabled));
     }
-    
+
     /// <summary>
     /// Assigns a track to this dance.
     /// </summary>
@@ -90,10 +92,10 @@ public class DanceItem : INotifyPropertyChanged
         OnPropertyChanged(nameof(DisplayName));
         OnPropertyChanged(nameof(IsEffectivelyDisabled));
     }
-    
+
     public event PropertyChangedEventHandler? PropertyChanged;
-    
-    protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+
+    private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
@@ -103,15 +105,16 @@ public class DanceItem : INotifyPropertyChanged
 /// Represents a category node in the dance category tree.
 /// Can contain both child categories and leaf dance items.
 /// </summary>
-public class DanceCategoryNode : INotifyPropertyChanged
+public sealed class DanceCategoryNode : INotifyPropertyChanged
 {
     private string _name = string.Empty;
     private int _weight;
-    
+
     [JsonPropertyName("name")]
-    public string Name 
-    { 
+    public string Name
+    {
         get => _name;
+        // ReSharper disable once PropertyCanBeMadeInitOnly.Global
         set
         {
             if (_name != value)
@@ -122,11 +125,12 @@ public class DanceCategoryNode : INotifyPropertyChanged
             }
         }
     }
-    
+
     [JsonPropertyName("weight")]
-    public int Weight 
-    { 
+    public int Weight
+    {
         get => _weight;
+        // ReSharper disable once PropertyCanBeMadeInitOnly.Global
         set
         {
             if (_weight != value)
@@ -137,25 +141,25 @@ public class DanceCategoryNode : INotifyPropertyChanged
             }
         }
     }
-    
+
     [JsonPropertyName("recurring")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public bool? Recurring { get; set; }
-    
+    public bool? Recurring { get; init; }
+
     [JsonPropertyName("dances")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<DanceItem>? Dances { get; set; }
-    
+
     [JsonPropertyName("children")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<DanceCategoryNode>? Children { get; set; }
-    
+
     /// <summary>
     /// Indicates if this is the virtual root node (not serialized).
     /// </summary>
     [JsonIgnore]
-    public bool IsRoot { get; set; }
-    
+    public bool IsRoot { get; init; }
+
     /// <summary>
     /// Total number of tracks in all dances under this category (recursive).
     /// </summary>
@@ -176,19 +180,19 @@ public class DanceCategoryNode : INotifyPropertyChanged
             return count;
         }
     }
-    
+
     /// <summary>
     /// Whether this category is effectively disabled (weight 0 or no tracks).
     /// </summary>
     [JsonIgnore]
     public bool IsEffectivelyDisabled => Weight == 0 || TrackCount == 0;
-    
+
     /// <summary>
     /// Display name - name with weight and track count.
     /// </summary>
     [JsonIgnore]
     public string DisplayName => IsRoot ? Name : $"{Name}  Weight: {Weight} ({TrackCount} tracks)";
-    
+
     private ObservableCollection<object>? _items;
 
     /// <summary>
@@ -221,7 +225,7 @@ public class DanceCategoryNode : INotifyPropertyChanged
             return _items;
         }
     }
-    
+
     /// <summary>
     /// Refreshes the Items collection after modifications.
     /// </summary>
@@ -230,7 +234,7 @@ public class DanceCategoryNode : INotifyPropertyChanged
         _items = null;
         OnPropertyChanged(nameof(Items));
     }
-    
+
     /// <summary>
     /// Clears all track assignments from dances in this category and all children.
     /// </summary>
@@ -251,7 +255,7 @@ public class DanceCategoryNode : INotifyPropertyChanged
             }
         }
     }
-    
+
     /// <summary>
     /// Refreshes display properties related to track counts.
     /// </summary>
@@ -260,7 +264,7 @@ public class DanceCategoryNode : INotifyPropertyChanged
         OnPropertyChanged(nameof(TrackCount));
         OnPropertyChanged(nameof(DisplayName));
         OnPropertyChanged(nameof(IsEffectivelyDisabled));
-        
+
         // Recurse into children
         if (Children != null)
         {
@@ -270,10 +274,10 @@ public class DanceCategoryNode : INotifyPropertyChanged
             }
         }
     }
-    
+
     public event PropertyChangedEventHandler? PropertyChanged;
-    
-    protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+
+    private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }

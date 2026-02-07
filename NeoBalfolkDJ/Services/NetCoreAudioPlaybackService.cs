@@ -14,12 +14,11 @@ namespace NeoBalfolkDJ.Services;
 /// </summary>
 public class NetCoreAudioPlaybackService : IPlaybackService
 {
+    private readonly ILoggingService _logger;
     private readonly Player _player;
     private readonly SemaphoreSlim _playbackLock = new(1, 1);
     private readonly Timer _progressTimer;
     private bool _disposed;
-    private Track? _currentTrack;
-    private bool _isPlaying;
     private bool _needsRestart; // True when stopped at beginning, needs Play() instead of Resume()
     private long _currentTimeMs;
     private long _durationMs;
@@ -32,24 +31,26 @@ public class NetCoreAudioPlaybackService : IPlaybackService
     public event EventHandler? TrackCleared;
 
     public bool IsInitialized => true;
-    public bool IsPlaying => _isPlaying;
-    public Track? CurrentTrack => _currentTrack;
+    public bool IsPlaying { get; private set; }
 
-    public NetCoreAudioPlaybackService()
+    public Track? CurrentTrack { get; private set; }
+
+    public NetCoreAudioPlaybackService(ILoggingService logger)
     {
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _player = new Player();
         _player.PlaybackFinished += OnPlaybackFinished;
 
         // Timer to track progress (NetCoreAudio doesn't provide time events)
         _progressTimer = new Timer(250); // Update every 250ms
         _progressTimer.Elapsed += OnProgressTimerElapsed;
-        
-        LoggingService.Info("NetCoreAudioPlaybackService: Initialized successfully");
+
+        _logger.Info("NetCoreAudioPlaybackService: Initialized successfully");
     }
 
     private void OnPlaybackFinished(object? sender, EventArgs e)
     {
-        _isPlaying = false;
+        IsPlaying = false;
         PlayingChanged?.Invoke(this, false);
         EndReached?.Invoke(this, EventArgs.Empty);
         _progressTimer.Stop();
@@ -57,7 +58,7 @@ public class NetCoreAudioPlaybackService : IPlaybackService
 
     private void OnProgressTimerElapsed(object? sender, ElapsedEventArgs e)
     {
-        if (_isPlaying && _durationMs > 0)
+        if (IsPlaying && _durationMs > 0)
         {
             _currentTimeMs += 250;
             if (_currentTimeMs > _durationMs)
@@ -74,23 +75,23 @@ public class NetCoreAudioPlaybackService : IPlaybackService
         try
         {
             // Stop current playback
-            if (_isPlaying)
+            if (IsPlaying)
             {
                 await _player.Stop();
                 _progressTimer.Stop();
             }
 
-            _currentTrack = track;
+            CurrentTrack = track;
             _currentTimeMs = 0;
-            
+
             // Get duration from track metadata if available, otherwise estimate
             _durationMs = (long)track.Length.TotalMilliseconds;
-            
-            LoggingService.Debug($"NetCoreAudioPlaybackService: Loading track: {track.Artist} - {track.Title}");
+
+            _logger.Debug($"NetCoreAudioPlaybackService: Loading track: {track.Artist} - {track.Title}");
 
             await _player.Play(track.FilePath);
-            _isPlaying = true;
-            
+            IsPlaying = true;
+
             // Notify listeners
             TrackLoaded?.Invoke(this, track);
             if (_durationMs > 0)
@@ -98,14 +99,14 @@ public class NetCoreAudioPlaybackService : IPlaybackService
                 LengthChanged?.Invoke(this, _durationMs);
             }
             PlayingChanged?.Invoke(this, true);
-            
+
             _progressTimer.Start();
-            
-            LoggingService.Debug($"NetCoreAudioPlaybackService: Started playback: {track.Artist} - {track.Title}");
+
+            _logger.Debug($"NetCoreAudioPlaybackService: Started playback: {track.Artist} - {track.Title}");
         }
         catch (Exception ex)
         {
-            LoggingService.Error($"NetCoreAudioPlaybackService: Error playing track: {track.FilePath}", ex);
+            _logger.Error($"NetCoreAudioPlaybackService: Error playing track: {track.FilePath}", ex);
             throw;
         }
         finally
@@ -119,19 +120,19 @@ public class NetCoreAudioPlaybackService : IPlaybackService
         await _playbackLock.WaitAsync();
         try
         {
-            if (_isPlaying)
+            if (IsPlaying)
             {
                 await _player.Pause();
-                _isPlaying = false;
+                IsPlaying = false;
                 _progressTimer.Stop();
                 PlayingChanged?.Invoke(this, false);
             }
-            else if (_currentTrack != null)
+            else if (CurrentTrack != null)
             {
                 if (_needsRestart)
                 {
                     // Track was stopped, need to play from beginning
-                    await _player.Play(_currentTrack.FilePath);
+                    await _player.Play(CurrentTrack.FilePath);
                     _needsRestart = false;
                 }
                 else
@@ -139,7 +140,7 @@ public class NetCoreAudioPlaybackService : IPlaybackService
                     // Track was paused, can resume
                     await _player.Resume();
                 }
-                _isPlaying = true;
+                IsPlaying = true;
                 _progressTimer.Start();
                 PlayingChanged?.Invoke(this, true);
             }
@@ -155,12 +156,12 @@ public class NetCoreAudioPlaybackService : IPlaybackService
         await _playbackLock.WaitAsync();
         try
         {
-            if (_currentTrack != null && !_isPlaying)
+            if (CurrentTrack != null && !IsPlaying)
             {
                 if (_needsRestart)
                 {
                     // Track was stopped, need to play from beginning
-                    await _player.Play(_currentTrack.FilePath);
+                    await _player.Play(CurrentTrack.FilePath);
                     _needsRestart = false;
                 }
                 else
@@ -168,7 +169,7 @@ public class NetCoreAudioPlaybackService : IPlaybackService
                     // Track was paused, can resume
                     await _player.Resume();
                 }
-                _isPlaying = true;
+                IsPlaying = true;
                 _progressTimer.Start();
                 PlayingChanged?.Invoke(this, true);
             }
@@ -184,10 +185,10 @@ public class NetCoreAudioPlaybackService : IPlaybackService
         await _playbackLock.WaitAsync();
         try
         {
-            if (_isPlaying)
+            if (IsPlaying)
             {
                 await _player.Pause();
-                _isPlaying = false;
+                IsPlaying = false;
                 _progressTimer.Stop();
                 PlayingChanged?.Invoke(this, false);
             }
@@ -204,7 +205,7 @@ public class NetCoreAudioPlaybackService : IPlaybackService
         try
         {
             await _player.Stop();
-            _isPlaying = false;
+            IsPlaying = false;
             _currentTimeMs = 0;
             _progressTimer.Stop();
             PlayingChanged?.Invoke(this, false);
@@ -222,12 +223,12 @@ public class NetCoreAudioPlaybackService : IPlaybackService
         try
         {
             await _player.Stop();
-            _isPlaying = false;
-            _currentTrack = null;
+            IsPlaying = false;
+            CurrentTrack = null;
             _currentTimeMs = 0;
             _durationMs = 0;
             _progressTimer.Stop();
-            
+
             TrackCleared?.Invoke(this, EventArgs.Empty);
         }
         finally
@@ -240,7 +241,7 @@ public class NetCoreAudioPlaybackService : IPlaybackService
     {
         // NetCoreAudio has limited seek support
         // This is a limitation of the library
-        LoggingService.Warning("NetCoreAudioPlaybackService: Seek not fully supported");
+        _logger.Warning("NetCoreAudioPlaybackService: Seek not fully supported");
         _currentTimeMs = positionMs;
         TimeChanged?.Invoke(this, _currentTimeMs);
         return Task.CompletedTask;
@@ -251,10 +252,10 @@ public class NetCoreAudioPlaybackService : IPlaybackService
         await _playbackLock.WaitAsync();
         try
         {
-            if (_currentTrack == null) return;
+            if (CurrentTrack == null) return;
 
-            var wasPlaying = _isPlaying;
-            var track = _currentTrack;
+            var wasPlaying = IsPlaying;
+            var track = CurrentTrack;
 
             // Stop current playback
             await _player.Stop();
@@ -266,7 +267,7 @@ public class NetCoreAudioPlaybackService : IPlaybackService
             {
                 // Restart playback from beginning
                 await _player.Play(track.FilePath);
-                _isPlaying = true;
+                IsPlaying = true;
                 _needsRestart = false;
                 _progressTimer.Start();
                 PlayingChanged?.Invoke(this, true);
@@ -274,7 +275,7 @@ public class NetCoreAudioPlaybackService : IPlaybackService
             else
             {
                 // Stay paused at beginning - need Play() not Resume() when user presses play
-                _isPlaying = false;
+                IsPlaying = false;
                 _needsRestart = true;
                 PlayingChanged?.Invoke(this, false);
             }
@@ -296,9 +297,9 @@ public class NetCoreAudioPlaybackService : IPlaybackService
 
         _player.PlaybackFinished -= OnPlaybackFinished;
         _player.Stop().GetAwaiter().GetResult();
-        
+
         _playbackLock.Dispose();
-        
-        LoggingService.Info("NetCoreAudioPlaybackService: Disposed");
+
+        _logger.Info("NetCoreAudioPlaybackService: Disposed");
     }
 }

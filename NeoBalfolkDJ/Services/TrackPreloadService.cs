@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using NeoBalfolkDJ.Models;
 
@@ -10,12 +11,13 @@ namespace NeoBalfolkDJ.Services;
 /// LibVLC handles actual I/O efficiently, so we just verify file accessibility ahead of time.
 /// Maintains a 2-slot cache for current and next track paths only.
 /// </summary>
-public class TrackPreloadService
+public sealed class TrackPreloadService(ILoggingService logger) : ITrackPreloadService, IDisposable
 {
+    private readonly ILoggingService _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private string? _currentTrackPath;
     private string? _nextTrackPath;
-    
-    private readonly object _lock = new();
+    private readonly Lock _lock = new();
+    private bool _disposed;
 
     /// <summary>
     /// Pre-verifies a track file is accessible asynchronously into the "next" slot.
@@ -24,40 +26,42 @@ public class TrackPreloadService
     /// <returns>True if file is accessible, false otherwise</returns>
     public async Task<bool> PreloadAsync(Track track)
     {
-        if (track == null || string.IsNullOrEmpty(track.FilePath))
+        if (_disposed) return false;
+
+        if (string.IsNullOrEmpty(track.FilePath))
         {
-            LoggingService.Warning("Attempted to preload null track or track with empty path");
+            _logger.Warning("Attempted to preload track with empty path");
             return false;
         }
 
         try
         {
-            LoggingService.Debug($"Verifying track accessibility: {track.Artist} - {track.Title}");
-            
+            _logger.Debug($"Verifying track accessibility: {track.Artist} - {track.Title}");
+
             // Verify file exists and is readable by opening it briefly
             await using var stream = new FileStream(
-                track.FilePath, 
-                FileMode.Open, 
-                FileAccess.Read, 
-                FileShare.Read, 
-                bufferSize: 4096, 
+                track.FilePath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                bufferSize: 4096,
                 useAsync: true);
-            
+
             // Just verify we can access the file - no need to read content
             // The file length check ensures the file is accessible
             _ = stream.Length;
-            
+
             lock (_lock)
             {
                 _nextTrackPath = track.FilePath;
             }
-            
-            LoggingService.Debug($"Track verified: {track.Artist} - {track.Title}");
+
+            _logger.Debug($"Track verified: {track.Artist} - {track.Title}");
             return true;
         }
         catch (Exception ex)
         {
-            LoggingService.Error($"Failed to verify track: {track.FilePath}", ex);
+            _logger.Error($"Failed to verify track: {track.FilePath}", ex);
             return false;
         }
     }
@@ -70,7 +74,7 @@ public class TrackPreloadService
     /// <returns>An empty byte array if track is verified, null otherwise</returns>
     public byte[]? GetCachedData(Track track)
     {
-        if (track == null || string.IsNullOrEmpty(track.FilePath))
+        if (string.IsNullOrEmpty(track.FilePath))
             return null;
 
         lock (_lock)
@@ -88,13 +92,15 @@ public class TrackPreloadService
     /// </summary>
     public void PromoteNextToCurrent()
     {
+        if (_disposed) return;
+
         lock (_lock)
         {
             _currentTrackPath = _nextTrackPath;
             _nextTrackPath = null;
         }
-        
-        LoggingService.Debug("Promoted next track to current");
+
+        _logger.Debug("Promoted next track to current");
     }
 
     /// <summary>
@@ -111,15 +117,17 @@ public class TrackPreloadService
     /// <summary>
     /// Clears all cached paths.
     /// </summary>
-    public void ClearAll()
+    public void Clear()
     {
+        if (_disposed) return;
+
         lock (_lock)
         {
             _currentTrackPath = null;
             _nextTrackPath = null;
         }
-        
-        LoggingService.Debug("Cleared all track cache");
+
+        _logger.Debug("Cleared all track cache");
     }
 
     /// <summary>
@@ -127,12 +135,24 @@ public class TrackPreloadService
     /// </summary>
     public bool IsCached(Track track)
     {
-        if (track == null || string.IsNullOrEmpty(track.FilePath))
+        if (string.IsNullOrEmpty(track.FilePath))
             return false;
 
         lock (_lock)
         {
             return _currentTrackPath == track.FilePath || _nextTrackPath == track.FilePath;
+        }
+    }
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+
+        lock (_lock)
+        {
+            _currentTrackPath = null;
+            _nextTrackPath = null;
         }
     }
 }

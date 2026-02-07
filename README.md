@@ -24,7 +24,9 @@ The application is mainly build with a small dance night in mind, but use it how
 
 - **Session History** - Track what you've played during the session to avoid repetition and export your playlist for future reference.
 
-📖 **[Read the full documentation](documentation/main.md)** for detailed instructions on how to use the application.
+📖 **[Read the full documentation](documentation/help.md)** for detailed instructions on how to use the application.
+
+🛠️ **[Architecture Documentation](documentation/architecture.md)** for developers - covers MVVM, dependency injection, event aggregator, command bus, and more.
 
 ---
 

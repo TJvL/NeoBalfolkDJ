@@ -12,42 +12,39 @@ namespace NeoBalfolkDJ.Services;
 /// Service for loading, saving, importing, and exporting the dance category tree.
 /// Stores the tree in user local application data with a default from embedded resources.
 /// </summary>
-public class DanceCategoryService
+public sealed class DanceCategoryService(ILoggingService logger, INotificationService? notificationService = null)
+    : IDanceCategoryService, IDisposable
 {
     private static readonly string DataDirectory = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "NeoBalfolkDJ");
-    
+
     private static readonly string DanceTreeFilePath = Path.Combine(DataDirectory, "dancetree.json");
-    
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
-    
+
     private static readonly JsonSerializerOptions StrictJsonOptions = new()
     {
         WriteIndented = true,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow
     };
-    
-    private readonly NotificationService? _notificationService;
-    
+
+    private readonly ILoggingService _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
     private List<DanceCategoryNode> _categories = new();
     private DanceCategoryNode? _virtualRoot;
-    
-    public DanceCategoryService(NotificationService? notificationService = null)
-    {
-        _notificationService = notificationService;
-    }
-    
+    private bool _disposed;
+
     /// <summary>
     /// Gets the current loaded categories.
     /// </summary>
     public IReadOnlyList<DanceCategoryNode> Categories => _categories;
-    
+
     /// <summary>
     /// Gets the virtual root node that contains all categories.
     /// </summary>
@@ -65,7 +62,7 @@ public class DanceCategoryService
         }
         return _virtualRoot;
     }
-    
+
     /// <summary>
     /// Loads the dance tree from user data, or extracts the default if not present.
     /// </summary>
@@ -75,14 +72,14 @@ public class DanceCategoryService
         {
             // Ensure directory exists
             Directory.CreateDirectory(DataDirectory);
-            
+
             // If user file doesn't exist, extract default from embedded resource
             if (!File.Exists(DanceTreeFilePath))
             {
-                LoggingService.Info("Dance tree file not found, extracting default");
+                _logger.Info("Dance tree file not found, extracting default");
                 ExtractDefaultDanceTree();
             }
-            
+
             // Load from user file
             if (File.Exists(DanceTreeFilePath))
             {
@@ -92,22 +89,22 @@ public class DanceCategoryService
                 {
                     _categories = categories;
                     _virtualRoot = null; // Invalidate virtual root
-                    LoggingService.Info($"Loaded dance tree with {_categories.Count} top-level categories");
+                    _logger.Info($"Loaded dance tree with {_categories.Count} top-level categories");
                     return _categories;
                 }
             }
         }
         catch (Exception ex)
         {
-            LoggingService.Error("Failed to load dance tree", ex);
-            _notificationService?.ShowNotification("Failed to load dance tree: " + ex.Message, NotificationSeverity.Error);
+            _logger.Error("Failed to load dance tree", ex);
+            notificationService?.ShowNotification("Failed to load dance tree: " + ex.Message, NotificationSeverity.Error);
         }
-        
+
         _categories = new List<DanceCategoryNode>();
         _virtualRoot = null; // Invalidate virtual root
         return _categories;
     }
-    
+
     /// <summary>
     /// Saves the current categories to user data.
     /// </summary>
@@ -118,15 +115,15 @@ public class DanceCategoryService
             Directory.CreateDirectory(DataDirectory);
             var json = JsonSerializer.Serialize(_categories, JsonOptions);
             File.WriteAllText(DanceTreeFilePath, json);
-            LoggingService.Info("Dance tree saved successfully");
+            _logger.Info("Dance tree saved successfully");
         }
         catch (Exception ex)
         {
-            LoggingService.Error("Failed to save dance tree", ex);
-            _notificationService?.ShowNotification("Failed to save dance tree: " + ex.Message, NotificationSeverity.Error);
+            _logger.Error("Failed to save dance tree", ex);
+            notificationService?.ShowNotification("Failed to save dance tree: " + ex.Message, NotificationSeverity.Error);
         }
     }
-    
+
     /// <summary>
     /// Imports a dance tree from the specified file path with strict JSON validation.
     /// </summary>
@@ -139,59 +136,59 @@ public class DanceCategoryService
             if (!File.Exists(filePath))
             {
                 var message = $"Import file not found: {filePath}";
-                LoggingService.Warning(message);
-                _notificationService?.ShowNotification(message, NotificationSeverity.Warning);
+                _logger.Warning(message);
+                notificationService?.ShowNotification(message, NotificationSeverity.Warning);
                 return false;
             }
-            
+
             var json = File.ReadAllText(filePath);
-            
+
             // Use strict deserialization to validate structure
             var categories = JsonSerializer.Deserialize<List<DanceCategoryNode>>(json, StrictJsonOptions);
-            
+
             if (categories == null)
             {
                 var message = "Import failed: JSON file contains null or invalid root structure";
-                LoggingService.Warning(message);
-                _notificationService?.ShowNotification(message, NotificationSeverity.Warning);
+                _logger.Warning(message);
+                notificationService?.ShowNotification(message, NotificationSeverity.Warning);
                 return false;
             }
-            
+
             // Validate the structure recursively
             ValidateCategoryStructure(categories);
-            
+
             // If validation passed, update and save
             _categories = categories;
             Save();
-            
+
             var successMessage = $"Successfully imported dance tree with {_categories.Count} top-level categories";
-            LoggingService.Info(successMessage);
-            _notificationService?.ShowNotification(successMessage, NotificationSeverity.Information);
+            _logger.Info(successMessage);
+            notificationService?.ShowNotification(successMessage, NotificationSeverity.Information);
             return true;
         }
         catch (JsonException ex)
         {
             var message = $"Import failed: Invalid JSON structure - {ex.Message}";
-            LoggingService.Error(message, ex);
-            _notificationService?.ShowNotification(message, NotificationSeverity.Error);
+            _logger.Error(message, ex);
+            notificationService?.ShowNotification(message, NotificationSeverity.Error);
             return false;
         }
         catch (InvalidOperationException ex)
         {
             var message = $"Import failed: {ex.Message}";
-            LoggingService.Error(message, ex);
-            _notificationService?.ShowNotification(message, NotificationSeverity.Error);
+            _logger.Error(message, ex);
+            notificationService?.ShowNotification(message, NotificationSeverity.Error);
             return false;
         }
         catch (Exception ex)
         {
             var message = $"Import failed: {ex.Message}";
-            LoggingService.Error(message, ex);
-            _notificationService?.ShowNotification(message, NotificationSeverity.Error);
+            _logger.Error(message, ex);
+            notificationService?.ShowNotification(message, NotificationSeverity.Error);
             return false;
         }
     }
-    
+
     /// <summary>
     /// Exports the current dance tree to the specified file path.
     /// </summary>
@@ -203,21 +200,42 @@ public class DanceCategoryService
         {
             var json = JsonSerializer.Serialize(_categories, JsonOptions);
             File.WriteAllText(filePath, json);
-            
+
             var successMessage = $"Successfully exported dance tree to {Path.GetFileName(filePath)}";
-            LoggingService.Info(successMessage);
-            _notificationService?.ShowNotification(successMessage, NotificationSeverity.Information);
+            _logger.Info(successMessage);
+            notificationService?.ShowNotification(successMessage, NotificationSeverity.Information);
             return true;
         }
         catch (Exception ex)
         {
             var message = $"Export failed: {ex.Message}";
-            LoggingService.Error(message, ex);
-            _notificationService?.ShowNotification(message, NotificationSeverity.Error);
+            _logger.Error(message, ex);
+            notificationService?.ShowNotification(message, NotificationSeverity.Error);
             return false;
         }
     }
-    
+
+    /// <summary>
+    /// Resets the dance tree to the embedded default.
+    /// </summary>
+    public void ResetToDefault()
+    {
+        try
+        {
+            if (File.Exists(DanceTreeFilePath))
+            {
+                File.Delete(DanceTreeFilePath);
+            }
+            ExtractDefaultDanceTree();
+            Load();
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("Failed to reset dance tree to default", ex);
+            notificationService?.ShowNotification("Failed to reset dance tree: " + ex.Message, NotificationSeverity.Error);
+        }
+    }
+
     /// <summary>
     /// Validates the structure of the imported categories recursively.
     /// </summary>
@@ -229,7 +247,7 @@ public class DanceCategoryService
             {
                 throw new InvalidOperationException("Category must have a non-empty name");
             }
-            
+
             // Validate dances if present
             if (category.Dances != null)
             {
@@ -241,7 +259,7 @@ public class DanceCategoryService
                     }
                 }
             }
-            
+
             // Recursively validate children
             if (category.Children != null)
             {
@@ -249,7 +267,7 @@ public class DanceCategoryService
             }
         }
     }
-    
+
     /// <summary>
     /// Extracts the default dance tree from embedded resources.
     /// </summary>
@@ -259,23 +277,30 @@ public class DanceCategoryService
         {
             var assembly = Assembly.GetExecutingAssembly();
             var resourceName = "NeoBalfolkDJ.Assets.dancetree.json";
-            
+
             using var stream = assembly.GetManifestResourceStream(resourceName);
             if (stream == null)
             {
-                LoggingService.Error($"Embedded resource '{resourceName}' not found");
+                _logger.Error($"Embedded resource '{resourceName}' not found");
                 return;
             }
-            
+
             using var reader = new StreamReader(stream);
             var json = reader.ReadToEnd();
-            
+
             File.WriteAllText(DanceTreeFilePath, json);
-            LoggingService.Info("Default dance tree extracted successfully");
+            _logger.Info("Default dance tree extracted successfully");
         }
         catch (Exception ex)
         {
-            LoggingService.Error("Failed to extract default dance tree", ex);
+            _logger.Error("Failed to extract default dance tree", ex);
         }
+    }
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+
+        _disposed = true;
     }
 }

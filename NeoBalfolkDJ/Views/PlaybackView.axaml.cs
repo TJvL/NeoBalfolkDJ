@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Threading;
+using NeoBalfolkDJ.Helpers;
 using NeoBalfolkDJ.ViewModels;
 
 namespace NeoBalfolkDJ.Views;
@@ -25,10 +26,10 @@ public partial class PlaybackView : UserControl
     public PlaybackView()
     {
         InitializeComponent();
-        
+
         // Use Loaded event for initial setup
         Loaded += OnLoaded;
-        
+
         // Watch for data context changes (track changes)
         DataContextChanged += OnDataContextChanged;
     }
@@ -40,10 +41,10 @@ public partial class PlaybackView : UserControl
         TrackInfoCanvas.PropertyChanged += OnTrackInfoCanvasPropertyChanged;
         MessageTextBlock.PropertyChanged += OnMessageTextBlockPropertyChanged;
         MessageCanvas.PropertyChanged += OnMessageCanvasPropertyChanged;
-        
+
         // Subscribe to confirmation events (only if not already subscribed via DataContextChanged)
         SubscribeToViewModel(DataContext as PlaybackViewModel);
-        
+
         // Initial animation start
         ScheduleMarqueeRestart();
         ScheduleMessageMarqueeRestart();
@@ -53,11 +54,11 @@ public partial class PlaybackView : UserControl
     {
         // Re-subscribe to confirmation events when DataContext changes
         SubscribeToViewModel(DataContext as PlaybackViewModel);
-        
+
         ScheduleMarqueeRestart();
         ScheduleMessageMarqueeRestart();
     }
-    
+
     private void SubscribeToViewModel(PlaybackViewModel? viewModel)
     {
         // Unsubscribe from previous view model if any
@@ -68,7 +69,7 @@ public partial class PlaybackView : UserControl
             _subscribedViewModel.ClearConfirmationRequested -= OnClearConfirmationRequested;
             _subscribedViewModel = null;
         }
-        
+
         // Subscribe to new view model
         if (viewModel != null)
         {
@@ -78,53 +79,62 @@ public partial class PlaybackView : UserControl
             _subscribedViewModel = viewModel;
         }
     }
-    
+
     private async void OnRestartConfirmationRequested(object? sender, EventArgs e)
     {
-        var topLevel = TopLevel.GetTopLevel(this);
-        if (topLevel == null) return;
-        
-        var dialog = new ConfirmationDialog();
-        dialog.Setup("Restart Track", "Are you sure you want to restart the current track?");
-        
-        await dialog.ShowDialog((Window)topLevel);
-        
-        if (dialog.IsConfirmed && DataContext is PlaybackViewModel viewModel)
+        AsyncHelper.SafeFireAndForget(async () =>
         {
-            await viewModel.ConfirmRestartAsync();
-        }
+            var topLevel = TopLevel.GetTopLevel(this);
+            if (topLevel == null) return;
+
+            var dialog = new ConfirmationDialog();
+            dialog.Setup("Restart Track", "Are you sure you want to restart the current track?");
+
+            await dialog.ShowDialog((Window)topLevel);
+
+            if (dialog.IsConfirmed && DataContext is PlaybackViewModel viewModel)
+            {
+                await viewModel.ConfirmRestartAsync();
+            }
+        });
     }
-    
+
     private async void OnSkipConfirmationRequested(object? sender, EventArgs e)
     {
-        var topLevel = TopLevel.GetTopLevel(this);
-        if (topLevel == null) return;
-        
-        var dialog = new ConfirmationDialog();
-        dialog.Setup("Skip to Next", "Are you sure you want to skip to the next item in the queue?");
-        
-        await dialog.ShowDialog((Window)topLevel);
-        
-        if (dialog.IsConfirmed && DataContext is PlaybackViewModel viewModel)
+        AsyncHelper.SafeFireAndForget(async () =>
         {
-            viewModel.ConfirmSkip();
-        }
+            var topLevel = TopLevel.GetTopLevel(this);
+            if (topLevel == null) return;
+
+            var dialog = new ConfirmationDialog();
+            dialog.Setup("Skip to Next", "Are you sure you want to skip to the next item in the queue?");
+
+            await dialog.ShowDialog((Window)topLevel);
+
+            if (dialog.IsConfirmed && DataContext is PlaybackViewModel viewModel)
+            {
+                viewModel.ConfirmSkip();
+            }
+        });
     }
-    
+
     private async void OnClearConfirmationRequested(object? sender, EventArgs e)
     {
-        var topLevel = TopLevel.GetTopLevel(this);
-        if (topLevel == null) return;
-        
-        var dialog = new ConfirmationDialog();
-        dialog.Setup("Clear Track", "Are you sure you want to clear the current track?");
-        
-        await dialog.ShowDialog((Window)topLevel);
-        
-        if (dialog.IsConfirmed && DataContext is PlaybackViewModel viewModel)
+        AsyncHelper.SafeFireAndForget(async () =>
         {
-            viewModel.ConfirmClear();
-        }
+            var topLevel = TopLevel.GetTopLevel(this);
+            if (topLevel == null) return;
+
+            var dialog = new ConfirmationDialog();
+            dialog.Setup("Clear Track", "Are you sure you want to clear the current track?");
+
+            await dialog.ShowDialog((Window)topLevel);
+
+            if (dialog.IsConfirmed && DataContext is PlaybackViewModel viewModel)
+            {
+                viewModel.ConfirmClear();
+            }
+        });
     }
 
     private void OnTrackInfoPanelPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
@@ -184,7 +194,7 @@ public partial class PlaybackView : UserControl
         _restartDebounce?.Cancel();
         _restartDebounce = new CancellationTokenSource();
         var token = _restartDebounce.Token;
-        
+
         _ = Task.Run(async () =>
         {
             try
@@ -204,11 +214,11 @@ public partial class PlaybackView : UserControl
         // Cancel any existing animation
         _marqueeAnimationCts?.Cancel();
         _marqueeAnimationCts = new CancellationTokenSource();
-        
+
         // Reset position and center vertically
         Canvas.SetLeft(TrackInfoPanel, 0);
         CenterPanelVertically();
-        
+
         // Start new animation if needed
         _isAnimating = false;
         _ = StartMarqueeAnimationAsync(_marqueeAnimationCts.Token);
@@ -218,7 +228,7 @@ public partial class PlaybackView : UserControl
     {
         var canvasHeight = TrackInfoCanvas.Bounds.Height;
         var panelHeight = TrackInfoPanel.Bounds.Height;
-        
+
         if (canvasHeight > 0 && panelHeight > 0)
         {
             var top = (canvasHeight - panelHeight) / 2;
@@ -229,46 +239,46 @@ public partial class PlaybackView : UserControl
     private async Task StartMarqueeAnimationAsync(CancellationToken token)
     {
         if (_isAnimating) return;
-        
+
         try
         {
             _isAnimating = true;
-            
+
             // Wait for layout to settle
             await Task.Delay(300, token);
-            
+
             // Ensure vertical centering
             await Dispatcher.UIThread.InvokeAsync(CenterPanelVertically);
-            
+
             while (!token.IsCancellationRequested)
             {
                 double canvasWidth = 0;
                 double panelWidth = 0;
-                
+
                 await Dispatcher.UIThread.InvokeAsync(() =>
                 {
                     canvasWidth = TrackInfoCanvas.Bounds.Width;
                     panelWidth = TrackInfoPanel.Bounds.Width;
                 });
-                
+
                 // Only scroll if text is wider than container
                 if (panelWidth > canvasWidth && canvasWidth > 0)
                 {
                     var scrollDistance = panelWidth - canvasWidth + 20; // Extra padding
                     var animationDuration = TimeSpan.FromMilliseconds(scrollDistance * 40); // Speed: 40ms per pixel
-                    
+
                     // Wait at start
                     await Task.Delay(2000, token);
-                    
+
                     // Scroll left
                     await AnimateCanvasLeftAsync(TrackInfoPanel, 0, -scrollDistance, animationDuration, token);
-                    
+
                     // Wait at end
                     await Task.Delay(2000, token);
-                    
+
                     // Reset to start
                     await Dispatcher.UIThread.InvokeAsync(() => Canvas.SetLeft(TrackInfoPanel, 0));
-                    
+
                     // Wait before repeating
                     await Task.Delay(1000, token);
                 }
@@ -282,7 +292,7 @@ public partial class PlaybackView : UserControl
                             Canvas.SetLeft(TrackInfoPanel, (canvasWidth - panelWidth) / 2);
                         }
                     });
-                    
+
                     // Check again after a delay (in case text changes)
                     await Task.Delay(2000, token);
                 }
@@ -290,7 +300,7 @@ public partial class PlaybackView : UserControl
         }
         catch (OperationCanceledException)
         {
-            // Animation was cancelled, that's fine
+            // Animation was canceled, that's fine
         }
         finally
         {
@@ -303,16 +313,16 @@ public partial class PlaybackView : UserControl
         const int frameRate = 60;
         var frameTime = TimeSpan.FromMilliseconds(1000.0 / frameRate);
         var totalFrames = (int)(duration.TotalMilliseconds / frameTime.TotalMilliseconds);
-        
+
         if (totalFrames <= 0) totalFrames = 1;
-        
+
         for (int i = 0; i <= totalFrames && !token.IsCancellationRequested; i++)
         {
             var progress = (double)i / totalFrames;
             var currentValue = from + (to - from) * progress;
-            
+
             await Dispatcher.UIThread.InvokeAsync(() => Canvas.SetLeft(target, currentValue));
-            
+
             try
             {
                 await Task.Delay(frameTime, token);
@@ -331,7 +341,7 @@ public partial class PlaybackView : UserControl
         _messageRestartDebounce?.Cancel();
         _messageRestartDebounce = new CancellationTokenSource();
         var token = _messageRestartDebounce.Token;
-        
+
         _ = Task.Run(async () =>
         {
             try
@@ -351,11 +361,11 @@ public partial class PlaybackView : UserControl
         // Cancel any existing animation
         _messageAnimationCts?.Cancel();
         _messageAnimationCts = new CancellationTokenSource();
-        
+
         // Reset position and center vertically
         Canvas.SetLeft(MessageTextBlock, 0);
         CenterMessageVertically();
-        
+
         // Start new animation if needed
         _isMessageAnimating = false;
         _ = StartMessageMarqueeAnimationAsync(_messageAnimationCts.Token);
@@ -365,7 +375,7 @@ public partial class PlaybackView : UserControl
     {
         var canvasHeight = MessageCanvas.Bounds.Height;
         var textHeight = MessageTextBlock.Bounds.Height;
-        
+
         if (canvasHeight > 0 && textHeight > 0)
         {
             var top = (canvasHeight - textHeight) / 2;
@@ -376,46 +386,46 @@ public partial class PlaybackView : UserControl
     private async Task StartMessageMarqueeAnimationAsync(CancellationToken token)
     {
         if (_isMessageAnimating) return;
-        
+
         try
         {
             _isMessageAnimating = true;
-            
+
             // Wait for layout to settle
             await Task.Delay(300, token);
-            
+
             // Ensure vertical centering
             await Dispatcher.UIThread.InvokeAsync(CenterMessageVertically);
-            
+
             while (!token.IsCancellationRequested)
             {
                 double canvasWidth = 0;
                 double textWidth = 0;
-                
+
                 await Dispatcher.UIThread.InvokeAsync(() =>
                 {
                     canvasWidth = MessageCanvas.Bounds.Width;
                     textWidth = MessageTextBlock.Bounds.Width;
                 });
-                
+
                 // Only scroll if text is wider than container
                 if (textWidth > canvasWidth && canvasWidth > 0)
                 {
                     var scrollDistance = textWidth - canvasWidth + 20; // Extra padding
                     var animationDuration = TimeSpan.FromMilliseconds(scrollDistance * 40); // Speed: 40ms per pixel
-                    
+
                     // Wait at start
                     await Task.Delay(2000, token);
-                    
+
                     // Scroll left
                     await AnimateCanvasLeftAsync(MessageTextBlock, 0, -scrollDistance, animationDuration, token);
-                    
+
                     // Wait at end
                     await Task.Delay(2000, token);
-                    
+
                     // Reset to start
                     await Dispatcher.UIThread.InvokeAsync(() => Canvas.SetLeft(MessageTextBlock, 0));
-                    
+
                     // Wait before repeating
                     await Task.Delay(1000, token);
                 }
@@ -429,7 +439,7 @@ public partial class PlaybackView : UserControl
                             Canvas.SetLeft(MessageTextBlock, (canvasWidth - textWidth) / 2);
                         }
                     });
-                    
+
                     // Check again after a delay (in case text changes)
                     await Task.Delay(2000, token);
                 }
@@ -437,7 +447,7 @@ public partial class PlaybackView : UserControl
         }
         catch (OperationCanceledException)
         {
-            // Animation was cancelled, that's fine
+            // Animation was canceled, that's fine
         }
         finally
         {
@@ -458,7 +468,7 @@ public partial class PlaybackView : UserControl
         TrackInfoCanvas.PropertyChanged -= OnTrackInfoCanvasPropertyChanged;
         MessageTextBlock.PropertyChanged -= OnMessageTextBlockPropertyChanged;
         MessageCanvas.PropertyChanged -= OnMessageCanvasPropertyChanged;
-        
+
         // Unsubscribe from view model events
         SubscribeToViewModel(null);
     }

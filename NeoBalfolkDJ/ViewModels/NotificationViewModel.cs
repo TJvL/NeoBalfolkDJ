@@ -23,16 +23,16 @@ public partial class NotificationViewModel : ViewModelBase
 
     private const int FadeDurationMs = 300;
     private const int DisplayDurationMs = 10000;
-    
+
     private CancellationTokenSource? _cancellationTokenSource;
 
     public async Task ShowNotification(string message, NotificationSeverity severity)
     {
         // Cancel any existing notification
-        _cancellationTokenSource?.Cancel();
+        if (_cancellationTokenSource != null) await _cancellationTokenSource.CancelAsync();
         _cancellationTokenSource = new CancellationTokenSource();
         var token = _cancellationTokenSource.Token;
-        
+
         Message = message;
         BackgroundColor = severity switch
         {
@@ -45,7 +45,7 @@ public partial class NotificationViewModel : ViewModelBase
         // Fade in
         IsVisible = true;
         await FadeIn(token);
-        
+
         if (token.IsCancellationRequested)
             return;
 
@@ -61,7 +61,7 @@ public partial class NotificationViewModel : ViewModelBase
 
         // Fade out
         await FadeOut(token);
-        
+
         if (!token.IsCancellationRequested)
         {
             IsVisible = false;
@@ -71,12 +71,12 @@ public partial class NotificationViewModel : ViewModelBase
     [RelayCommand]
     public async Task CloseNotification()
     {
-        _cancellationTokenSource?.Cancel();
+        if (_cancellationTokenSource != null) await _cancellationTokenSource.CancelAsync();
         _cancellationTokenSource = new CancellationTokenSource();
         var token = _cancellationTokenSource.Token;
-        
+
         await FadeOut(token);
-        
+
         if (!token.IsCancellationRequested)
         {
             IsVisible = false;
@@ -92,7 +92,7 @@ public partial class NotificationViewModel : ViewModelBase
         {
             if (token.IsCancellationRequested)
                 return;
-                
+
             Opacity = (double)i / steps;
             await Task.Delay(stepDelay, CancellationToken.None);
         }
@@ -107,7 +107,7 @@ public partial class NotificationViewModel : ViewModelBase
         {
             if (token.IsCancellationRequested)
                 return;
-                
+
             Opacity = (double)i / steps;
             await Task.Delay(stepDelay, CancellationToken.None);
         }

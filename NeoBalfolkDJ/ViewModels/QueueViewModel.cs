@@ -5,6 +5,9 @@ using System.Linq;
 using Avalonia.Controls;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using NeoBalfolkDJ.Messaging;
+using NeoBalfolkDJ.Messaging.Commands;
+using NeoBalfolkDJ.Messaging.Events;
 using NeoBalfolkDJ.Models;
 using NeoBalfolkDJ.Services;
 
@@ -12,28 +15,23 @@ namespace NeoBalfolkDJ.ViewModels;
 
 public partial class QueueViewModel : ViewModelBase
 {
-    private TrackStoreService? _trackStore;
-    private SessionTrackHistoryService? _sessionHistory;
+    private readonly ILoggingService? _logger;
+    private readonly ISettingsService? _settingsService;
+    private readonly IEventAggregator? _eventAggregator;
+    private readonly ICommandBus? _commandBus;
+
+    private ITrackStoreService? _trackStore;
+    private ISessionTrackHistoryService? _sessionHistory;
     private Track? _currentlyPlayingTrack;
-    
+
     public ObservableCollection<IQueueItem> QueuedItems { get; } = new();
-    
-    public NotificationService? NotificationService { get; set; }
 
-    /// <summary>
-    /// Event raised when the first item in queue changes (added to empty queue or after dequeue)
-    /// </summary>
-    public event EventHandler<IQueueItem?>? FirstItemChanged;
+    public INotificationService? NotificationService { get; set; }
 
-    /// <summary>
-    /// Event raised when settings is requested
-    /// </summary>
-    public event EventHandler? SettingsRequested;
-
-    /// <summary>
-    /// Event raised when refresh of auto-queued track is requested (needs new random track)
-    /// </summary>
-    public event EventHandler<AutoQueuedTrack>? RefreshAutoQueuedTrackRequested;
+    // Note: FirstItemChanged replaced by QueueFirstItemChangedEvent via IEventAggregator
+    // Note: HistoryModeChanged replaced by HistoryModeChangedEvent via IEventAggregator
+    // Note: SettingsRequested replaced by ShowSettingsCommand
+    // Note: RefreshAutoQueuedTrackRequested replaced by RefreshAutoQueueCommand
 
     [ObservableProperty]
     private IQueueItem? _selectedItem;
@@ -59,10 +57,6 @@ public partial class QueueViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(StatusText))]
     private bool _isHistoryMode;
 
-    /// <summary>
-    /// Event raised when history mode changes
-    /// </summary>
-    public event EventHandler<bool>? HistoryModeChanged;
 
     /// <summary>
     /// Returns true if the queue has any items
@@ -82,8 +76,8 @@ public partial class QueueViewModel : ViewModelBase
     /// <summary>
     /// Status text shown at the bottom - changes based on history mode
     /// </summary>
-    public string StatusText => IsHistoryMode 
-        ? $"total played: {_sessionHistory?.TotalDurationFormatted ?? "0:00"}" 
+    public string StatusText => IsHistoryMode
+        ? $"total played: {_sessionHistory?.TotalDurationFormatted ?? "0:00"}"
         : QueueFinishTime;
 
     /// <summary>
@@ -91,16 +85,31 @@ public partial class QueueViewModel : ViewModelBase
     /// </summary>
     public ReadOnlyObservableCollection<Track>? HistoryItems => _sessionHistory?.PlayedTracks;
 
-    public QueueViewModel()
+    /// <summary>
+    /// Design-time constructor
+    /// </summary>
+    public QueueViewModel() : this(null!, null!, null!, null!)
     {
-        LoadSettings();
-        
         if (Design.IsDesignMode)
         {
             LoadDesignTimeData();
         }
+    }
+
+    public QueueViewModel(ILoggingService logger, ISettingsService settingsService, IEventAggregator eventAggregator, ICommandBus commandBus)
+    {
+        _logger = logger;
+        _settingsService = settingsService;
+        _eventAggregator = eventAggregator;
+        _commandBus = commandBus;
+
+        if (!Design.IsDesignMode && _settingsService != null)
+        {
+            LoadSettings();
+        }
+
         UpdateFinishTime();
-        
+
         // Monitor collection changes
         QueuedItems.CollectionChanged += OnQueuedItemsChanged;
     }
@@ -113,7 +122,7 @@ public partial class QueueViewModel : ViewModelBase
     /// <summary>
     /// Sets the TrackStoreService for shuffle functionality
     /// </summary>
-    public void SetTrackStore(TrackStoreService trackStore)
+    public void SetTrackStore(ITrackStoreService trackStore)
     {
         _trackStore = trackStore;
     }
@@ -121,7 +130,7 @@ public partial class QueueViewModel : ViewModelBase
     /// <summary>
     /// Sets the session history service for tracking played tracks
     /// </summary>
-    public void SetSessionHistory(SessionTrackHistoryService sessionHistory)
+    public void SetSessionHistory(ISessionTrackHistoryService sessionHistory)
     {
         _sessionHistory = sessionHistory;
         _sessionHistory.HistoryChanged += OnHistoryChanged;
@@ -144,7 +153,9 @@ public partial class QueueViewModel : ViewModelBase
 
     private void LoadSettings()
     {
-        var settings = SettingsService.Load();
+        var settings = _settingsService?.Load();
+        if (settings == null) return;
+
         MaxQueueItems = settings.MaxQueueItems;
         DelaySeconds = settings.DelaySeconds;
         AllowDuplicateTracksInQueue = settings.AllowDuplicateTracksInQueue;
@@ -162,30 +173,18 @@ public partial class QueueViewModel : ViewModelBase
 
     private void LoadDesignTimeData()
     {
-        QueuedItems.Add(new Track
-        {
-            Dance = "Mazurka",
-            Artist = "Sample Artist",
-            Title = "Queued Track 1",
-            Length = TimeSpan.FromSeconds(195)
-        });
+        QueuedItems.Add(new Track("Mazurka", "Sample Artist", "Queued Track 1", TimeSpan.FromSeconds(195), ""));
 
         QueuedItems.Add(new StopMarker());
 
-        QueuedItems.Add(new Track
-        {
-            Dance = "Waltz",
-            Artist = "Folk Band",
-            Title = "Queued Track 2",
-            Length = TimeSpan.FromSeconds(180)
-        });
+        QueuedItems.Add(new Track("Waltz", "Folk Band", "Queued Track 2", TimeSpan.FromSeconds(180), ""));
     }
 
     public void AddTrack(Track track)
     {
         // Remove any auto-queued items when manually adding
         RemoveAutoQueuedItems();
-        
+
         if (QueuedItems.Count >= MaxQueueItems)
         {
             NotificationService?.ShowNotification($"Queue is full (max {MaxQueueItems} items)", NotificationSeverity.Warning);
@@ -198,16 +197,20 @@ public partial class QueueViewModel : ViewModelBase
             NotificationService?.ShowNotification("Track has already been played or is in the queue", NotificationSeverity.Warning);
             return;
         }
-        
+
         var wasEmpty = QueuedItems.Count == 0;
         QueuedItems.Add(track);
         UpdateFinishTime();
-        LoggingService.Debug($"Track added to queue: {track.Artist} - {track.Title}");
-        
+        _logger?.Debug($"Track added to queue: {track.Artist} - {track.Title}");
+
+        // Publish events
+        _eventAggregator?.Publish(new TrackAddedToQueueEvent(track));
+        _eventAggregator?.Publish(new QueueChangedEvent(QueuedItems.Count, HasManualItems, HasAutoQueuedItem));
+
         // If this is the first item, notify listeners
         if (wasEmpty)
         {
-            FirstItemChanged?.Invoke(this, track);
+            _eventAggregator?.Publish(new QueueFirstItemChangedEvent(track));
         }
     }
 
@@ -219,22 +222,22 @@ public partial class QueueViewModel : ViewModelBase
         // Check if in queue
         if (ContainsTrack(track))
             return true;
-        
+
         // Check if currently playing
         if (_currentlyPlayingTrack != null && _currentlyPlayingTrack.Equals(track))
             return true;
-        
+
         // Check session history
         if (_sessionHistory != null && _sessionHistory.HasBeenPlayed(track))
             return true;
-        
+
         return false;
     }
 
     /// <summary>
     /// Checks if a track is already in the queue (including auto-queued tracks)
     /// </summary>
-    public bool ContainsTrack(Track track)
+    private bool ContainsTrack(Track track)
     {
         return QueuedItems.Any(item => item switch
         {
@@ -253,16 +256,16 @@ public partial class QueueViewModel : ViewModelBase
         {
             return; // Silently fail for auto-queue
         }
-        
+
         var wasEmpty = QueuedItems.Count == 0;
         var autoQueued = new AutoQueuedTrack(track);
         QueuedItems.Add(autoQueued);
         UpdateFinishTime();
-        LoggingService.Debug($"Auto-queued track added: {track.Artist} - {track.Title}");
-        
+        _logger?.Debug($"Auto-queued track added: {track.Artist} - {track.Title}");
+
         if (wasEmpty)
         {
-            FirstItemChanged?.Invoke(this, autoQueued);
+            _eventAggregator?.Publish(new QueueFirstItemChangedEvent(autoQueued));
         }
     }
 
@@ -275,13 +278,13 @@ public partial class QueueViewModel : ViewModelBase
         foreach (var item in autoQueued)
         {
             QueuedItems.Remove(item);
-            LoggingService.Debug($"Auto-queued track removed: {item.Artist} - {item.Title}");
+            _logger?.Debug($"Auto-queued track removed: {item.Artist} - {item.Title}");
         }
-        
+
         if (autoQueued.Count > 0)
         {
             UpdateFinishTime();
-            FirstItemChanged?.Invoke(this, PeekFirst());
+            _eventAggregator?.Publish(new QueueFirstItemChangedEvent(PeekFirst()));
         }
     }
 
@@ -292,16 +295,16 @@ public partial class QueueViewModel : ViewModelBase
     {
         var index = QueuedItems.IndexOf(autoQueued);
         if (index < 0) return;
-        
+
         var track = autoQueued.Track;
         QueuedItems[index] = track;
-        
-        LoggingService.Debug($"Auto-queued track pinned: {track.Artist} - {track.Title}");
-        
+
+        _logger?.Debug($"Auto-queued track pinned: {track.Artist} - {track.Title}");
+
         // Notify if this was the first item
         if (index == 0)
         {
-            FirstItemChanged?.Invoke(this, track);
+            _eventAggregator?.Publish(new QueueFirstItemChangedEvent(track));
         }
     }
 
@@ -310,7 +313,7 @@ public partial class QueueViewModel : ViewModelBase
     /// </summary>
     public void RefreshAutoQueuedTrack(AutoQueuedTrack autoQueued)
     {
-        RefreshAutoQueuedTrackRequested?.Invoke(this, autoQueued);
+        _commandBus?.SendAsync(new RefreshAutoQueueCommand());
     }
 
     /// <summary>
@@ -320,17 +323,17 @@ public partial class QueueViewModel : ViewModelBase
     {
         var index = QueuedItems.IndexOf(oldItem);
         if (index < 0) return;
-        
+
         var newAutoQueued = new AutoQueuedTrack(newTrack);
         QueuedItems[index] = newAutoQueued;
         UpdateFinishTime();
-        
-        LoggingService.Debug($"Auto-queued track replaced: {oldItem.Title} -> {newTrack.Title}");
-        
+
+        _logger?.Debug($"Auto-queued track replaced: {oldItem.Title} -> {newTrack.Title}");
+
         // Notify if this was the first item
         if (index == 0)
         {
-            FirstItemChanged?.Invoke(this, newAutoQueued);
+            _eventAggregator?.Publish(new QueueFirstItemChangedEvent(newAutoQueued));
         }
     }
 
@@ -345,23 +348,23 @@ public partial class QueueViewModel : ViewModelBase
         var item = QueuedItems[0];
         QueuedItems.RemoveAt(0);
         UpdateFinishTime();
-        
+
         switch (item)
         {
             case Track track:
-                LoggingService.Debug($"Track dequeued: {track.Artist} - {track.Title}");
+                _logger?.Debug($"Track dequeued: {track.Artist} - {track.Title}");
                 break;
             case StopMarker:
-                LoggingService.Debug("Stop marker dequeued");
+                _logger?.Debug("Stop marker dequeued");
                 break;
             case DelayMarker delay:
-                LoggingService.Debug($"Delay marker dequeued: {delay.Duration.TotalSeconds} seconds");
+                _logger?.Debug($"Delay marker dequeued: {delay.Duration.TotalSeconds} seconds");
                 break;
         }
-        
+
         // Notify about new first item (or null if queue is now empty)
-        FirstItemChanged?.Invoke(this, PeekFirst());
-        
+        _eventAggregator?.Publish(new QueueFirstItemChangedEvent(PeekFirst()));
+
         return item;
     }
 
@@ -378,19 +381,19 @@ public partial class QueueViewModel : ViewModelBase
         var (secondsUntilStopOrEnd, hasStop) = CalculateDurationUntilStopOrEnd();
         var currentTrackSeconds = _currentTrackRemainingMs / 1000.0;
         var totalSeconds = secondsUntilStopOrEnd + currentTrackSeconds;
-        
+
         if (totalSeconds > 0)
         {
             var finishTime = DateTime.Now.AddSeconds(totalSeconds);
-            QueueFinishTime = hasStop 
-                ? $"next stop at: {finishTime:HH:mm}" 
+            QueueFinishTime = hasStop
+                ? $"next stop at: {finishTime:HH:mm}"
                 : $"queue finishes at: {finishTime:HH:mm}";
         }
         else
         {
             QueueFinishTime = "queue finishes at: --:--";
         }
-        
+
         OnPropertyChanged(nameof(StatusText));
     }
 
@@ -401,23 +404,23 @@ public partial class QueueViewModel : ViewModelBase
     private (double seconds, bool hasStop) CalculateDurationUntilStopOrEnd()
     {
         double totalSeconds = 0;
-        
+
         foreach (var item in QueuedItems)
         {
             if (item is StopMarker)
             {
                 return (totalSeconds, true);
             }
-            
+
             // MessageMarker without delay behaves like a stop
-            if (item is MessageMarker msg && !msg.HasDelay)
+            if (item is MessageMarker { HasDelay: false })
             {
                 return (totalSeconds, true);
             }
-            
+
             totalSeconds += item.Duration.TotalSeconds;
         }
-        
+
         return (totalSeconds, false);
     }
 
@@ -433,14 +436,14 @@ public partial class QueueViewModel : ViewModelBase
     [RelayCommand]
     private void Settings()
     {
-        SettingsRequested?.Invoke(this, EventArgs.Empty);
+        _commandBus?.SendAsync(new ShowSettingsCommand());
     }
 
     [RelayCommand]
     private void ToggleHistoryMode()
     {
         IsHistoryMode = !IsHistoryMode;
-        HistoryModeChanged?.Invoke(this, IsHistoryMode);
+        _eventAggregator?.Publish(new HistoryModeChangedEvent(IsHistoryMode));
     }
 
     [RelayCommand]
@@ -470,21 +473,21 @@ public partial class QueueViewModel : ViewModelBase
     {
         // Remove any auto-queued items when manually adding
         RemoveAutoQueuedItems();
-        
+
         if (QueuedItems.Count >= MaxQueueItems)
         {
             NotificationService?.ShowNotification($"Queue is full (max {MaxQueueItems} items)", NotificationSeverity.Warning);
             return;
         }
-        
+
         var wasEmpty = QueuedItems.Count == 0;
         QueuedItems.Add(new StopMarker());
         UpdateFinishTime();
-        LoggingService.Debug("Stop marker added to queue");
-        
+        _logger?.Debug("Stop marker added to queue");
+
         if (wasEmpty)
         {
-            FirstItemChanged?.Invoke(this, PeekFirst());
+            _eventAggregator?.Publish(new QueueFirstItemChangedEvent(PeekFirst()));
         }
     }
 
@@ -495,21 +498,21 @@ public partial class QueueViewModel : ViewModelBase
     {
         // Remove any auto-queued items when manually adding
         RemoveAutoQueuedItems();
-        
+
         if (QueuedItems.Count >= MaxQueueItems)
         {
             NotificationService?.ShowNotification($"Queue is full (max {MaxQueueItems} items)", NotificationSeverity.Warning);
             return;
         }
-        
+
         var wasEmpty = QueuedItems.Count == 0;
         QueuedItems.Add(new DelayMarker(DelaySeconds));
         UpdateFinishTime();
-        LoggingService.Debug($"Delay marker added to queue: {DelaySeconds} seconds");
-        
+        _logger?.Debug($"Delay marker added to queue: {DelaySeconds} seconds");
+
         if (wasEmpty)
         {
-            FirstItemChanged?.Invoke(this, PeekFirst());
+            _eventAggregator?.Publish(new QueueFirstItemChangedEvent(PeekFirst()));
         }
     }
 
@@ -520,24 +523,24 @@ public partial class QueueViewModel : ViewModelBase
     {
         // Remove any auto-queued items when manually adding
         RemoveAutoQueuedItems();
-        
+
         if (QueuedItems.Count >= MaxQueueItems)
         {
             NotificationService?.ShowNotification($"Queue is full (max {MaxQueueItems} items)", NotificationSeverity.Warning);
             return;
         }
-        
+
         var wasEmpty = QueuedItems.Count == 0;
         var marker = new MessageMarker(message, delaySeconds);
         QueuedItems.Add(marker);
         UpdateFinishTime();
-        
+
         var behavior = marker.HasDelay ? $"delay {delaySeconds}s" : "stop";
-        LoggingService.Debug($"Message marker added to queue: \"{message}\" ({behavior})");
-        
+        _logger?.Debug($"Message marker added to queue: \"{message}\" ({behavior})");
+
         if (wasEmpty)
         {
-            FirstItemChanged?.Invoke(this, PeekFirst());
+            _eventAggregator?.Publish(new QueueFirstItemChangedEvent(PeekFirst()));
         }
     }
 
@@ -567,17 +570,17 @@ public partial class QueueViewModel : ViewModelBase
             QueuedItems.Remove(item);
             SelectedItem = null;
             UpdateFinishTime();
-            
+
             switch (item)
             {
                 case Track track:
-                    LoggingService.Debug($"Track removed from queue: {track.Artist} - {track.Title}");
+                    _logger?.Debug($"Track removed from queue: {track.Artist} - {track.Title}");
                     break;
                 case StopMarker:
-                    LoggingService.Debug("Stop marker removed from queue");
+                    _logger?.Debug("Stop marker removed from queue");
                     break;
                 case DelayMarker delay:
-                    LoggingService.Debug($"Delay marker removed from queue: {delay.Duration.TotalSeconds} seconds");
+                    _logger?.Debug($"Delay marker removed from queue: {delay.Duration.TotalSeconds} seconds");
                     break;
             }
         }
@@ -587,11 +590,16 @@ public partial class QueueViewModel : ViewModelBase
     public void ClearQueue()
     {
         if (QueuedItems.Count == 0) return;
-        
+
         var count = QueuedItems.Count;
         QueuedItems.Clear();
         SelectedItem = null;
         UpdateFinishTime();
-        LoggingService.Debug($"Queue cleared: {count} items removed");
+        _logger?.Debug($"Queue cleared: {count} items removed");
+
+        // Publish events
+        _eventAggregator?.Publish(new QueueClearedEvent());
+        _eventAggregator?.Publish(new QueueChangedEvent(0, false, false));
+        _eventAggregator?.Publish(new QueueFirstItemChangedEvent(null));
     }
 }

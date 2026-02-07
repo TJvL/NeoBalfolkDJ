@@ -14,8 +14,7 @@ public partial class QueueView : UserControl
 
     private void OnRefreshAutoQueuedClick(object? sender, RoutedEventArgs e)
     {
-        if (sender is Button button && 
-            button.DataContext is AutoQueuedTrack autoQueued &&
+        if (sender is Button { DataContext: AutoQueuedTrack autoQueued } &&
             DataContext is QueueViewModel viewModel)
         {
             viewModel.RefreshAutoQueuedTrack(autoQueued);
@@ -24,8 +23,7 @@ public partial class QueueView : UserControl
 
     private void OnPinAutoQueuedClick(object? sender, RoutedEventArgs e)
     {
-        if (sender is Button button && 
-            button.DataContext is AutoQueuedTrack autoQueued &&
+        if (sender is Button { DataContext: AutoQueuedTrack autoQueued } &&
             DataContext is QueueViewModel viewModel)
         {
             viewModel.PinAutoQueuedTrack(autoQueued);

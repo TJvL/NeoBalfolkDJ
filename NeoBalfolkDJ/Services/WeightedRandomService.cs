@@ -9,26 +9,30 @@ namespace NeoBalfolkDJ.Services;
 /// Service for weighted random track selection from the dance tree.
 /// Handles track assignment to dances and weighted random selection.
 /// </summary>
-public class WeightedRandomService
+public sealed class WeightedRandomService(
+    ILoggingService logger,
+    IDanceCategoryService categoryService,
+    IDanceSynonymService synonymService,
+    INotificationService notificationService)
+    : IWeightedRandomService, IDisposable
 {
-    private readonly DanceCategoryService _categoryService;
-    private readonly DanceSynonymService _synonymService;
-    private readonly NotificationService _notificationService;
+    private readonly ILoggingService _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
+    private readonly IDanceCategoryService _categoryService =
+        categoryService ?? throw new ArgumentNullException(nameof(categoryService));
+
+    private readonly IDanceSynonymService _synonymService =
+        synonymService ?? throw new ArgumentNullException(nameof(synonymService));
+
+    private readonly INotificationService _notificationService =
+        notificationService ?? throw new ArgumentNullException(nameof(notificationService));
+
     private readonly Random _random = new();
-    
+    private bool _disposed;
+
     // Cache of normalized dance names to DanceItem for fast lookup
-    private Dictionary<string, DanceItem> _normalizedDanceNameLookup = new();
-    
-    public WeightedRandomService(
-        DanceCategoryService categoryService,
-        DanceSynonymService synonymService,
-        NotificationService notificationService)
-    {
-        _categoryService = categoryService;
-        _synonymService = synonymService;
-        _notificationService = notificationService;
-    }
-    
+    private readonly Dictionary<string, DanceItem> _normalizedDanceNameLookup = new();
+
     /// <summary>
     /// Assigns all tracks to matching dances in the tree.
     /// Uses normalized name matching with synonyms.
@@ -38,19 +42,19 @@ public class WeightedRandomService
         var root = _categoryService.GetRootNode();
         if (root == null)
         {
-            LoggingService.Warning("Cannot assign tracks: dance tree not loaded");
+            _logger.Warning("Cannot assign tracks: dance tree not loaded");
             return;
         }
-        
+
         // Clear all existing assignments
         root.ClearAllTrackAssignments();
-        
+
         // Build lookup table of normalized dance names to DanceItem
         BuildDanceLookup(root);
-        
+
         var assignedCount = 0;
         var unassignedCount = 0;
-        
+
         foreach (var track in tracks)
         {
             var danceItem = FindDanceForTrack(track);
@@ -64,55 +68,54 @@ public class WeightedRandomService
                 unassignedCount++;
             }
         }
-        
+
         // Refresh track counts in the tree
         root.RefreshTrackCounts();
-        
-        LoggingService.Info($"Track assignment complete: {assignedCount} assigned, {unassignedCount} unassigned");
-        
+
+        _logger.Info($"Track assignment complete: {assignedCount} assigned, {unassignedCount} unassigned");
+
         if (unassignedCount > 0)
         {
-            LoggingService.Debug($"{unassignedCount} tracks did not match any dance in the tree");
+            _logger.Debug($"{unassignedCount} tracks did not match any dance in the tree");
         }
     }
-    
+
     /// <summary>
     /// Builds a lookup dictionary from normalized dance names (and synonyms) to DanceItem.
     /// </summary>
     private void BuildDanceLookup(DanceCategoryNode root)
     {
         _normalizedDanceNameLookup.Clear();
-        
+
         var allDances = GetAllDances(root);
-        
+
         foreach (var dance in allDances)
         {
             var normalizedName = StringNormalizer.NormalizeForComparison(dance.Name);
-            
+
             // Add the dance's own name
-            if (!string.IsNullOrEmpty(normalizedName) && !_normalizedDanceNameLookup.ContainsKey(normalizedName))
+            if (!string.IsNullOrEmpty(normalizedName))
             {
-                _normalizedDanceNameLookup[normalizedName] = dance;
+                _normalizedDanceNameLookup.TryAdd(normalizedName, dance);
             }
-            
+
             // Add synonyms for this dance name
             var synonymEntry = FindSynonymEntry(normalizedName);
             if (synonymEntry != null)
             {
-                foreach (var synonym in synonymEntry.Synonyms)
+                foreach (var normalizedSynonym in synonymEntry.Synonyms.Select(StringNormalizer.NormalizeForComparison)
+                             .Where(normalizedSynonym => !string.IsNullOrEmpty(normalizedSynonym) &&
+                                                         !_normalizedDanceNameLookup.ContainsKey(normalizedSynonym)))
                 {
-                    var normalizedSynonym = StringNormalizer.NormalizeForComparison(synonym);
-                    if (!string.IsNullOrEmpty(normalizedSynonym) && !_normalizedDanceNameLookup.ContainsKey(normalizedSynonym))
-                    {
-                        _normalizedDanceNameLookup[normalizedSynonym] = dance;
-                    }
+                    _normalizedDanceNameLookup[normalizedSynonym] = dance;
                 }
             }
         }
-        
-        LoggingService.Debug($"Built dance lookup with {_normalizedDanceNameLookup.Count} entries for {allDances.Count} dances");
+
+        _logger.Debug(
+            $"Built dance lookup with {_normalizedDanceNameLookup.Count} entries for {allDances.Count} dances");
     }
-    
+
     /// <summary>
     /// Finds the synonym entry that matches the given normalized dance name.
     /// </summary>
@@ -124,7 +127,7 @@ public class WeightedRandomService
             {
                 return entry;
             }
-            
+
             // Also check if the dance name matches any synonym
             foreach (var synonym in entry.Synonyms)
             {
@@ -134,9 +137,10 @@ public class WeightedRandomService
                 }
             }
         }
+
         return null;
     }
-    
+
     /// <summary>
     /// Finds the DanceItem that matches the track's dance name.
     /// </summary>
@@ -144,30 +148,25 @@ public class WeightedRandomService
     {
         if (string.IsNullOrWhiteSpace(track.Dance))
             return null;
-        
+
         var normalizedTrackDance = StringNormalizer.NormalizeForComparison(track.Dance);
-        
+
         // Direct lookup
-        if (_normalizedDanceNameLookup.TryGetValue(normalizedTrackDance, out var dance))
-        {
-            return dance;
-        }
-        
-        return null;
+        return _normalizedDanceNameLookup.GetValueOrDefault(normalizedTrackDance);
     }
-    
+
     /// <summary>
     /// Gets all DanceItem leaves from the tree recursively.
     /// </summary>
     private List<DanceItem> GetAllDances(DanceCategoryNode node)
     {
         var dances = new List<DanceItem>();
-        
+
         if (node.Dances != null)
         {
             dances.AddRange(node.Dances);
         }
-        
+
         if (node.Children != null)
         {
             foreach (var child in node.Children)
@@ -175,10 +174,10 @@ public class WeightedRandomService
                 dances.AddRange(GetAllDances(child));
             }
         }
-        
+
         return dances;
     }
-    
+
     /// <summary>
     /// Selects a random track from the entire tree using weighted random selection.
     /// </summary>
@@ -192,10 +191,10 @@ public class WeightedRandomService
             _notificationService.ShowNotification("Dance tree not loaded", NotificationSeverity.Warning);
             return null;
         }
-        
+
         return SelectRandomTrackFromBranch(root, excludeFilter);
     }
-    
+
     /// <summary>
     /// Selects a random track from a specific branch using weighted random selection.
     /// </summary>
@@ -205,30 +204,32 @@ public class WeightedRandomService
     public Track? SelectRandomTrackFromBranch(DanceCategoryNode branch, Func<Track, bool>? excludeFilter = null)
     {
         var selectedDance = SelectDanceFromNode(branch, excludeFilter);
-        
+
         if (selectedDance == null)
         {
-            _notificationService.ShowNotification("No tracks available for random selection", NotificationSeverity.Warning);
+            _notificationService.ShowNotification("No tracks available for random selection",
+                NotificationSeverity.Warning);
             return null;
         }
-        
+
         // Get available tracks (apply filter)
         var availableTracks = excludeFilter != null
             ? selectedDance.AssignedTracks.Where(t => !excludeFilter(t)).ToList()
             : selectedDance.AssignedTracks.ToList();
-        
+
         if (availableTracks.Count == 0)
         {
             // This shouldn't happen if SelectDanceFromNode works correctly, but handle it
-            _notificationService.ShowNotification("No tracks available for random selection", NotificationSeverity.Warning);
+            _notificationService.ShowNotification("No tracks available for random selection",
+                NotificationSeverity.Warning);
             return null;
         }
-        
+
         // Simple random pick from available tracks
         var index = _random.Next(availableTracks.Count);
         return availableTracks[index];
     }
-    
+
     /// <summary>
     /// Performs weighted random selection to choose a dance from the tree.
     /// Skips nodes with weight 0 or no available tracks.
@@ -238,7 +239,7 @@ public class WeightedRandomService
         // Collect eligible items (categories and dances with weight > 0 and available tracks)
         var eligibleChildren = new List<(DanceCategoryNode node, int weight)>();
         var eligibleDances = new List<(DanceItem dance, int weight)>();
-        
+
         // Check child categories
         if (node.Children != null)
         {
@@ -250,7 +251,7 @@ public class WeightedRandomService
                 }
             }
         }
-        
+
         // Check direct dances
         if (node.Dances != null)
         {
@@ -262,19 +263,19 @@ public class WeightedRandomService
                 }
             }
         }
-        
+
         // Calculate total weight
         var totalWeight = eligibleChildren.Sum(c => c.weight) + eligibleDances.Sum(d => d.weight);
-        
+
         if (totalWeight == 0)
         {
             return null; // No eligible items
         }
-        
+
         // Random selection
         var randomValue = _random.Next(totalWeight);
         var cumulative = 0;
-        
+
         // Check children first
         foreach (var (child, weight) in eligibleChildren)
         {
@@ -285,7 +286,7 @@ public class WeightedRandomService
                 return SelectDanceFromNode(child, excludeFilter);
             }
         }
-        
+
         // Check dances
         foreach (var (dance, weight) in eligibleDances)
         {
@@ -295,11 +296,11 @@ public class WeightedRandomService
                 return dance;
             }
         }
-        
+
         // Should not reach here, but return null just in case
         return null;
     }
-    
+
     /// <summary>
     /// Checks if a category node has any available tracks (after filtering).
     /// </summary>
@@ -315,7 +316,7 @@ public class WeightedRandomService
                 }
             }
         }
-        
+
         if (node.Children != null)
         {
             foreach (var child in node.Children)
@@ -326,10 +327,10 @@ public class WeightedRandomService
                 }
             }
         }
-        
+
         return false;
     }
-    
+
     /// <summary>
     /// Checks if a dance has any available tracks (after filtering).
     /// </summary>
@@ -337,11 +338,18 @@ public class WeightedRandomService
     {
         if (dance.AssignedTracks.Count == 0)
             return false;
-        
+
         if (excludeFilter == null)
             return true;
-        
+
         return dance.AssignedTracks.Any(t => !excludeFilter(t));
     }
-}
 
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+
+        _normalizedDanceNameLookup.Clear();
+    }
+}

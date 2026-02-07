@@ -1,36 +1,32 @@
 using Avalonia;
 using Avalonia.Controls;
-using NeoBalfolkDJ.Services;
 
 namespace NeoBalfolkDJ.Views;
 
 public partial class PresentationWindow : Window
 {
     private bool _allowClose;
-    private PixelPoint _lastNormalPosition;
-    private Size _lastNormalSize;
     private bool _initialized;
 
     public PresentationWindow()
     {
         InitializeComponent();
-        
+
         PositionChanged += OnPositionChanged;
         PropertyChanged += OnPropertyChanged;
-        
+
         Opened += (_, _) =>
         {
             // Capture initial state after window is fully opened
             if (WindowState == WindowState.Normal)
             {
-                _lastNormalPosition = Position;
+                LastNormalPosition = Position;
                 if (Width > 0 && Height > 0)
                 {
-                    _lastNormalSize = new Size(Width, Height);
+                    LastNormalSize = new Size(Width, Height);
                 }
             }
             _initialized = true;
-            LoggingService.Debug($"PresentationWindow opened: pos=({Position.X},{Position.Y}), size=({Width}x{Height}), state={WindowState}");
         };
     }
 
@@ -39,30 +35,29 @@ public partial class PresentationWindow : Window
         // Only track position when in normal state
         if (_initialized && WindowState == WindowState.Normal)
         {
-            _lastNormalPosition = Position;
-            LoggingService.Debug($"PresentationWindow position changed: ({Position.X},{Position.Y})");
+            LastNormalPosition = Position;
         }
     }
 
     private void OnPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
     {
         if (!_initialized) return;
-        
+
         if (e.Property == BoundsProperty && WindowState == WindowState.Normal)
         {
             if (Width > 0 && Height > 0)
             {
-                _lastNormalSize = new Size(Width, Height);
+                LastNormalSize = new Size(Width, Height);
             }
         }
-        
+
         // When returning to normal state, capture position/size
         if (e.Property == WindowStateProperty && WindowState == WindowState.Normal)
         {
-            _lastNormalPosition = Position;
+            LastNormalPosition = Position;
             if (Width > 0 && Height > 0)
             {
-                _lastNormalSize = new Size(Width, Height);
+                LastNormalSize = new Size(Width, Height);
             }
         }
     }
@@ -70,19 +65,19 @@ public partial class PresentationWindow : Window
     /// <summary>
     /// Gets the last normal (non-maximized) position
     /// </summary>
-    public PixelPoint LastNormalPosition => _lastNormalPosition;
+    public PixelPoint LastNormalPosition { get; private set; }
 
     /// <summary>
     /// Gets the last normal (non-maximized) size
     /// </summary>
-    public Size LastNormalSize => _lastNormalSize;
+    public Size LastNormalSize { get; private set; }
 
     /// <summary>
     /// Sets the initial normal position (used when restoring from saved state)
     /// </summary>
     public void SetLastNormalPosition(PixelPoint position)
     {
-        _lastNormalPosition = position;
+        LastNormalPosition = position;
     }
 
     /// <summary>
@@ -90,7 +85,7 @@ public partial class PresentationWindow : Window
     /// </summary>
     public void SetLastNormalSize(Size size)
     {
-        _lastNormalSize = size;
+        LastNormalSize = size;
     }
 
     /// <summary>

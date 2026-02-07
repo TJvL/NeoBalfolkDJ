@@ -4,6 +4,9 @@ using Avalonia.Controls;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using NeoBalfolkDJ.Messaging;
+using NeoBalfolkDJ.Messaging.Commands;
+using NeoBalfolkDJ.Messaging.Events;
 using NeoBalfolkDJ.Models;
 using NeoBalfolkDJ.Services;
 
@@ -11,7 +14,9 @@ namespace NeoBalfolkDJ.ViewModels;
 
 public partial class PlaybackViewModel : ViewModelBase, IDisposable
 {
-    private readonly IPlaybackService _playbackService;
+    private readonly IPlaybackService? _playbackService;
+    private readonly ICommandBus? _commandBus;
+    private readonly IEventAggregator? _eventAggregator;
     private bool _disposed;
 
     [ObservableProperty]
@@ -65,46 +70,28 @@ public partial class PlaybackViewModel : ViewModelBase, IDisposable
     private bool _isMessageMode;
 
     public bool HasTrack => CurrentTrack != null;
-    
+
     /// <summary>
     /// Play button enabled when queue has items OR a track is loaded
     /// </summary>
     public bool CanPlay => QueueHasItems || HasTrack;
-    
+
     /// <summary>
     /// Restart button enabled when a track is loaded
     /// </summary>
     public bool CanRestart => HasTrack;
-    
+
     /// <summary>
     /// Next/Clear button enabled when queue has items OR a track is loaded OR stop marker is active
     /// </summary>
     public bool CanNextOrClear => QueueHasItems || HasTrack || IsStopMarkerActive;
-    
+
     /// <summary>
     /// Show next icon when queue has items, otherwise show clear (X) icon
     /// </summary>
     public bool ShowNextIcon => QueueHasItems;
 
-    /// <summary>
-    /// Event raised when play is pressed but no track is loaded
-    /// </summary>
-    public event EventHandler? PlaybackStartRequested;
-    
-    /// <summary>
-    /// Event raised when next track is requested (end of track or user pressed next)
-    /// </summary>
-    public event EventHandler? NextTrackRequested;
-
-    /// <summary>
-    /// Event raised when a track finishes playing naturally (reached the end)
-    /// </summary>
-    public event EventHandler? TrackFinished;
-
-    /// <summary>
-    /// Event raised when the current track is cleared (user cleared or programmatically)
-    /// </summary>
-    public event EventHandler? TrackCleared;
+    // Note: PlaybackStartRequested, NextTrackRequested, TrackFinished replaced by ICommandBus/IEventAggregator
 
     /// <summary>
     /// Event raised when clear track confirmation is needed (View shows dialog)
@@ -121,20 +108,30 @@ public partial class PlaybackViewModel : ViewModelBase, IDisposable
     /// </summary>
     public event EventHandler? SkipConfirmationRequested;
 
-    public PlaybackViewModel() : this(new NetCoreAudioPlaybackService())
+    /// <summary>
+    /// Design-time constructor
+    /// </summary>
+    public PlaybackViewModel() : this(null!, null!, null!)
     {
-    }
-
-    public PlaybackViewModel(IPlaybackService playbackService)
-    {
-        _playbackService = playbackService;
-        
-        // Load design-time data for previewing in designer
         if (Design.IsDesignMode)
         {
             LoadDesignTimeData();
+        }
+    }
+
+    public PlaybackViewModel(IPlaybackService playbackService, ICommandBus commandBus, IEventAggregator eventAggregator)
+    {
+        _playbackService = playbackService;
+        _commandBus = commandBus;
+        _eventAggregator = eventAggregator;
+
+        // Load design-time data for previewing in designer
+        if (Design.IsDesignMode)
+        {
             return;
         }
+
+        if (_playbackService == null) return;
 
         // Subscribe to service events and marshal to UI thread
         _playbackService.TimeChanged += OnTimeChanged;
@@ -147,12 +144,7 @@ public partial class PlaybackViewModel : ViewModelBase, IDisposable
 
     private void LoadDesignTimeData()
     {
-        CurrentTrack = new Track
-        {
-            Dance = "Mazurka",
-            Artist = "Sample Artist",
-            Title = "Sample Track Title"
-        };
+        CurrentTrack = new Track("Mazurka", "Sample Artist", "Sample Track Title", TimeSpan.FromMinutes(3.75), "");
         DanceName = "Mazurka";
         ArtistName = "Sample Artist";
         TrackTitle = "Sample Track Title";
@@ -187,9 +179,13 @@ public partial class PlaybackViewModel : ViewModelBase, IDisposable
         Dispatcher.UIThread.Post(() =>
         {
             IsPlaying = false;
+            // Publish event that track finished
+            if (CurrentTrack != null)
+            {
+                _eventAggregator?.Publish(new TrackFinishedEvent(CurrentTrack));
+            }
             // Auto-advance to next track
-            NextTrackRequested?.Invoke(this, EventArgs.Empty);
-            TrackFinished?.Invoke(this, EventArgs.Empty);
+            _commandBus?.SendAsync(new PlayNextTrackCommand());
         });
     }
 
@@ -213,6 +209,9 @@ public partial class PlaybackViewModel : ViewModelBase, IDisposable
             DanceName = track.Dance;
             ArtistName = track.Artist;
             TrackTitle = track.Title;
+            
+            // Publish event that track started
+            _eventAggregator?.Publish(new TrackStartedEvent(track));
         });
     }
 
@@ -231,9 +230,6 @@ public partial class PlaybackViewModel : ViewModelBase, IDisposable
             CurrentTime = "0:00";
             TotalTime = "0:00";
             IsPlaying = false;
-            
-            // Notify that track was cleared
-            TrackCleared?.Invoke(this, EventArgs.Empty);
         });
     }
 
@@ -278,7 +274,7 @@ public partial class PlaybackViewModel : ViewModelBase, IDisposable
 
     /// <summary>
     /// Displays the message marker state.
-    /// If totalMs is provided, shows countdown like delay. Otherwise behaves like stop.
+    /// If totalMs is provided, shows countdown like delay. Otherwise, behaves like stop.
     /// </summary>
     public void ShowMessageMarker(string message, long? totalMs = null)
     {
@@ -287,7 +283,7 @@ public partial class PlaybackViewModel : ViewModelBase, IDisposable
         DanceName = message;
         ArtistName = " ";
         TrackTitle = " ";
-        
+
         if (totalMs.HasValue)
         {
             // Message with delay - show countdown
@@ -326,7 +322,7 @@ public partial class PlaybackViewModel : ViewModelBase, IDisposable
     /// </summary>
     public Task PlayTrackAsync(Track track)
     {
-        return _playbackService.PlayTrackAsync(track);
+        return _playbackService?.PlayTrackAsync(track) ?? Task.CompletedTask;
     }
 
     /// <summary>
@@ -334,7 +330,7 @@ public partial class PlaybackViewModel : ViewModelBase, IDisposable
     /// </summary>
     public Task ClearTrackAsync()
     {
-        return _playbackService.ClearTrackAsync();
+        return _playbackService?.ClearTrackAsync() ?? Task.CompletedTask;
     }
 
     /// <summary>
@@ -342,7 +338,7 @@ public partial class PlaybackViewModel : ViewModelBase, IDisposable
     /// </summary>
     public Task StopPlaybackAsync()
     {
-        return _playbackService.StopAsync();
+        return _playbackService?.StopAsync() ?? Task.CompletedTask;
     }
 
     /// <summary>
@@ -360,18 +356,21 @@ public partial class PlaybackViewModel : ViewModelBase, IDisposable
         if (IsStopMarkerActive && QueueHasItems)
         {
             IsStopMarkerActive = false;
-            PlaybackStartRequested?.Invoke(this, EventArgs.Empty);
-            return;
-        }
-        
-        // If no track is loaded but queue has items, request playback start
-        if (!HasTrack && QueueHasItems)
-        {
-            PlaybackStartRequested?.Invoke(this, EventArgs.Empty);
+            _commandBus?.SendAsync(new PlayNextTrackCommand());
             return;
         }
 
-        await _playbackService.PlayPauseAsync();
+        // If no track is loaded but queue has items, request playback start
+        if (!HasTrack && QueueHasItems)
+        {
+            _commandBus?.SendAsync(new PlayNextTrackCommand());
+            return;
+        }
+
+        if (_playbackService != null)
+        {
+            await _playbackService.PlayPauseAsync();
+        }
     }
 
     [RelayCommand(CanExecute = nameof(CanRestart))]
@@ -379,13 +378,13 @@ public partial class PlaybackViewModel : ViewModelBase, IDisposable
     {
         RestartConfirmationRequested?.Invoke(this, EventArgs.Empty);
     }
-    
+
     /// <summary>
     /// Called by View after user confirms restart.
     /// </summary>
     public async Task ConfirmRestartAsync()
     {
-        if (!HasTrack) return;
+        if (!HasTrack || _playbackService == null) return;
         await _playbackService.RestartAsync();
     }
 
@@ -411,13 +410,13 @@ public partial class PlaybackViewModel : ViewModelBase, IDisposable
             TrackTitle = "...";
         }
     }
-    
+
     /// <summary>
     /// Called by View after user confirms skipping to next.
     /// </summary>
     public void ConfirmSkip()
     {
-        NextTrackRequested?.Invoke(this, EventArgs.Empty);
+        _commandBus?.SendAsync(new PlayNextTrackCommand());
     }
 
     /// <summary>
@@ -433,13 +432,16 @@ public partial class PlaybackViewModel : ViewModelBase, IDisposable
         if (_disposed) return;
         _disposed = true;
 
-        _playbackService.TimeChanged -= OnTimeChanged;
-        _playbackService.LengthChanged -= OnLengthChanged;
-        _playbackService.EndReached -= OnEndReached;
-        _playbackService.PlayingChanged -= OnPlayingChanged;
-        _playbackService.TrackLoaded -= OnTrackLoaded;
-        _playbackService.TrackCleared -= OnTrackCleared;
-        
-        _playbackService.Dispose();
+        if (_playbackService != null)
+        {
+            _playbackService.TimeChanged -= OnTimeChanged;
+            _playbackService.LengthChanged -= OnLengthChanged;
+            _playbackService.EndReached -= OnEndReached;
+            _playbackService.PlayingChanged -= OnPlayingChanged;
+            _playbackService.TrackLoaded -= OnTrackLoaded;
+            _playbackService.TrackCleared -= OnTrackCleared;
+
+            _playbackService.Dispose();
+        }
     }
 }

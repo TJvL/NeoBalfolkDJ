@@ -10,11 +10,13 @@ using WindowStateSettings = NeoBalfolkDJ.Models.WindowState;
 
 namespace NeoBalfolkDJ.Services;
 
-public class PresentationDisplayService : IDisposable
+public class PresentationDisplayService(ILoggingService logger, ISettingsService settingsService, Window owner)
+    : IPresentationDisplayService, IDisposable
 {
+    private readonly ILoggingService _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly ISettingsService _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
     private readonly List<PresentationWindow> _windows = new();
     private readonly List<PresentationDisplayViewModel> _viewModels = new();
-    private readonly Window _owner;
     private bool _disposed;
 
     // Track current state so new windows can be initialized properly
@@ -24,11 +26,6 @@ public class PresentationDisplayService : IDisposable
     private IQueueItem? _nextItem;
     private double _currentProgress;
     private double _currentDuration;
-
-    public PresentationDisplayService(Window owner)
-    {
-        _owner = owner;
-    }
 
     /// <summary>
     /// Updates the number of presentation windows to display
@@ -50,23 +47,23 @@ public class PresentationDisplayService : IDisposable
         }
 
         // Load saved window states
-        var settings = SettingsService.Load();
+        var settings = _settingsService.Load();
 
         // Open new windows
         while (_windows.Count < count)
         {
             var windowIndex = _windows.Count;
             var viewModel = new PresentationDisplayViewModel();
-            
+
             // Initialize with current state
             ApplyCurrentState(viewModel);
-            
+
             var window = new PresentationWindow
             {
                 DataContext = viewModel,
                 Title = $"Presentation Display {windowIndex + 1}"
             };
-            
+
             // Get saved state if available
             WindowStateSettings? savedState = null;
             if (windowIndex < settings.PresentationWindowStates.Count)
@@ -74,13 +71,13 @@ public class PresentationDisplayService : IDisposable
                 savedState = settings.PresentationWindowStates[windowIndex];
                 // Restore size and position before showing
                 RestoreWindowSizeAndPosition(window, savedState);
-                
+
                 // Set the last normal position/size for tracking (important for maximized windows)
-                if (savedState.X.HasValue && savedState.Y.HasValue)
+                if (savedState is { X: not null, Y: not null })
                 {
                     window.SetLastNormalPosition(new PixelPoint((int)savedState.X.Value, (int)savedState.Y.Value));
                 }
-                if (savedState.Width.HasValue && savedState.Height.HasValue)
+                if (savedState is { Width: not null, Height: not null })
                 {
                     window.SetLastNormalSize(new Size(savedState.Width.Value, savedState.Height.Value));
                 }
@@ -88,34 +85,33 @@ public class PresentationDisplayService : IDisposable
 
             _viewModels.Add(viewModel);
             _windows.Add(window);
-            window.Show(_owner);
-            
+            window.Show(owner);
+
             // Restore maximized state after window is shown
             if (savedState?.IsMaximized == true)
             {
                 window.WindowState = WindowState.Maximized;
-                LoggingService.Debug($"Restored presentation window {windowIndex} to maximized state");
+                _logger.Debug($"Restored presentation window {windowIndex} to maximized state");
             }
         }
 
-        LoggingService.Debug($"Presentation display count updated to {count}");
+        _logger.Debug($"Presentation display count updated to {count}");
     }
 
     private void RestoreWindowSizeAndPosition(PresentationWindow window, WindowStateSettings state)
     {
-        if (state.Width.HasValue && state.Height.HasValue &&
-            state.Width.Value > 0 && state.Height.Value > 0)
+        if (state is { Width: > 0, Height: > 0 })
         {
             window.Width = state.Width.Value;
             window.Height = state.Height.Value;
-            LoggingService.Debug($"Restoring presentation window size: {state.Width}x{state.Height}");
+            _logger.Debug($"Restoring presentation window size: {state.Width}x{state.Height}");
         }
-        
-        if (state.X.HasValue && state.Y.HasValue)
+
+        if (state is { X: not null, Y: not null })
         {
             window.Position = new PixelPoint((int)state.X.Value, (int)state.Y.Value);
             window.WindowStartupLocation = WindowStartupLocation.Manual;
-            LoggingService.Debug($"Restoring presentation window position: {state.X},{state.Y}");
+            _logger.Debug($"Restoring presentation window position: {state.X},{state.Y}");
         }
     }
 
@@ -124,9 +120,9 @@ public class PresentationDisplayService : IDisposable
     /// </summary>
     public void SaveWindowStates()
     {
-        var settings = SettingsService.Load();
+        var settings = _settingsService.Load();
         settings.PresentationWindowStates.Clear();
-        
+
         for (int i = 0; i < _windows.Count; i++)
         {
             var window = _windows[i];
@@ -134,14 +130,14 @@ public class PresentationDisplayService : IDisposable
             {
                 IsMaximized = window.WindowState == WindowState.Maximized
             };
-            
+
             if (window.WindowState == WindowState.Normal)
             {
                 state.X = window.Position.X;
                 state.Y = window.Position.Y;
                 state.Width = window.Width;
                 state.Height = window.Height;
-                LoggingService.Debug($"Saving presentation window {i} normal state: pos=({window.Position.X},{window.Position.Y}), size=({window.Width}x{window.Height})");
+                _logger.Debug($"Saving presentation window {i} normal state: pos=({window.Position.X},{window.Position.Y}), size=({window.Width}x{window.Height})");
             }
             else
             {
@@ -150,14 +146,14 @@ public class PresentationDisplayService : IDisposable
                 state.Y = window.LastNormalPosition.Y;
                 state.Width = window.LastNormalSize.Width > 0 ? window.LastNormalSize.Width : 800;
                 state.Height = window.LastNormalSize.Height > 0 ? window.LastNormalSize.Height : 600;
-                LoggingService.Debug($"Saving presentation window {i} maximized state: lastPos=({window.LastNormalPosition.X},{window.LastNormalPosition.Y}), lastSize=({window.LastNormalSize.Width}x{window.LastNormalSize.Height})");
+                _logger.Debug($"Saving presentation window {i} maximized state: lastPos=({window.LastNormalPosition.X},{window.LastNormalPosition.Y}), lastSize=({window.LastNormalSize.Width}x{window.LastNormalSize.Height})");
             }
-            
+
             settings.PresentationWindowStates.Add(state);
         }
-        
-        SettingsService.Save(settings);
-        LoggingService.Debug($"Saved {_windows.Count} presentation window states");
+
+        _settingsService.Save(settings);
+        _logger.Debug($"Saved {_windows.Count} presentation window states");
     }
 
     /// <summary>
@@ -181,7 +177,7 @@ public class PresentationDisplayService : IDisposable
                 vm.Clear();
                 break;
         }
-        
+
         vm.UpdateNextItem(_nextItem);
         vm.UpdateProgress(_currentProgress, _currentDuration);
     }
@@ -193,7 +189,7 @@ public class PresentationDisplayService : IDisposable
     {
         _currentState = track != null ? DisplayState.Track : DisplayState.Empty;
         _currentTrack = track;
-        
+
         foreach (var vm in _viewModels)
         {
             vm.UpdateCurrentTrack(track);
@@ -207,7 +203,7 @@ public class PresentationDisplayService : IDisposable
     {
         _currentState = DisplayState.Stop;
         _currentTrack = null;
-        
+
         foreach (var vm in _viewModels)
         {
             vm.ShowStopMarker();
@@ -223,7 +219,7 @@ public class PresentationDisplayService : IDisposable
         _currentTrack = null;
         _currentDuration = durationMs;
         _currentProgress = 0;
-        
+
         foreach (var vm in _viewModels)
         {
             vm.ShowDelayMarker(durationMs);
@@ -239,7 +235,7 @@ public class PresentationDisplayService : IDisposable
         _currentTrack = null;
         _currentDuration = durationMs ?? 0;
         _currentProgress = 0;
-        
+
         foreach (var vm in _viewModels)
         {
             vm.ShowMessageMarker(message, durationMs);
@@ -252,7 +248,7 @@ public class PresentationDisplayService : IDisposable
     public void UpdateNextItem(IQueueItem? item)
     {
         _nextItem = item;
-        
+
         foreach (var vm in _viewModels)
         {
             vm.UpdateNextItem(item);
@@ -266,7 +262,7 @@ public class PresentationDisplayService : IDisposable
     {
         _currentProgress = progress;
         _currentDuration = duration;
-        
+
         foreach (var vm in _viewModels)
         {
             vm.UpdateProgress(progress, duration);
@@ -283,7 +279,7 @@ public class PresentationDisplayService : IDisposable
         _nextItem = null;
         _currentProgress = 0;
         _currentDuration = 0;
-        
+
         foreach (var vm in _viewModels)
         {
             vm.Clear();

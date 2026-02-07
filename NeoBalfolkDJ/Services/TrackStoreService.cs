@@ -10,11 +10,12 @@ namespace NeoBalfolkDJ.Services;
 /// Central service that manages the in-memory index of all tracks.
 /// Monitors the configured music directory for changes and keeps the track list in sync.
 /// </summary>
-public class TrackStoreService : IDisposable
+public sealed class TrackStoreService : ITrackStoreService, IDisposable
 {
+    private readonly ILoggingService _logger;
+    private readonly IMusicScannerService _musicScanner;
     private readonly ObservableCollection<Track> _tracks = new();
     private FileSystemWatcher? _fileWatcher;
-    private string _musicDirectoryPath = string.Empty;
     private bool _disposed;
 
     /// <summary>
@@ -37,15 +38,19 @@ public class TrackStoreService : IDisposable
     /// </summary>
     public event EventHandler? TracksReloaded;
 
-    public TrackStoreService()
+    public TrackStoreService(ILoggingService logger, IMusicScannerService musicScanner)
     {
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _musicScanner = musicScanner ?? throw new ArgumentNullException(nameof(musicScanner));
         Tracks = new ReadOnlyObservableCollection<Track>(_tracks);
     }
+
+    ~TrackStoreService() => Dispose(disposing: false);
 
     /// <summary>
     /// Gets the currently configured music directory path
     /// </summary>
-    public string MusicDirectoryPath => _musicDirectoryPath;
+    public string MusicDirectoryPath { get; private set; } = string.Empty;
 
     /// <summary>
     /// Gets a random track from the store, or null if the store is empty
@@ -95,18 +100,18 @@ public class TrackStoreService : IDisposable
     {
         if (string.IsNullOrWhiteSpace(directoryPath))
         {
-            LoggingService.Warning("Attempted to set empty music directory path");
+            _logger.Warning("Attempted to set empty music directory path");
             return;
         }
 
-        _musicDirectoryPath = directoryPath;
-        
+        MusicDirectoryPath = directoryPath;
+
         // Stop any existing file watcher
         StopFileWatcher();
-        
+
         // Load all tracks from the directory
         ReloadTracks();
-        
+
         // Start watching for changes
         StartFileWatcher();
     }
@@ -114,38 +119,38 @@ public class TrackStoreService : IDisposable
     /// <summary>
     /// Reloads all tracks from the current music directory
     /// </summary>
-    public void ReloadTracks()
+    private void ReloadTracks()
     {
         _tracks.Clear();
 
-        if (string.IsNullOrWhiteSpace(_musicDirectoryPath) || !Directory.Exists(_musicDirectoryPath))
+        if (string.IsNullOrWhiteSpace(MusicDirectoryPath) || !Directory.Exists(MusicDirectoryPath))
         {
-            LoggingService.Warning($"Music directory does not exist: {_musicDirectoryPath}");
+            _logger.Warning($"Music directory does not exist: {MusicDirectoryPath}");
             TracksReloaded?.Invoke(this, EventArgs.Empty);
             return;
         }
 
-        var scannedTracks = MusicScannerService.ScanDirectory(_musicDirectoryPath);
-        
+        var scannedTracks = _musicScanner.ScanDirectory(MusicDirectoryPath);
+
         foreach (var track in scannedTracks)
         {
             _tracks.Add(track);
         }
 
-        LoggingService.Info($"TrackStore loaded {_tracks.Count} tracks");
+        _logger.Info($"TrackStore loaded {_tracks.Count} tracks");
         TracksReloaded?.Invoke(this, EventArgs.Empty);
     }
 
     private void StartFileWatcher()
     {
-        if (string.IsNullOrWhiteSpace(_musicDirectoryPath) || !Directory.Exists(_musicDirectoryPath))
+        if (string.IsNullOrWhiteSpace(MusicDirectoryPath) || !Directory.Exists(MusicDirectoryPath))
         {
             return;
         }
 
         try
         {
-            _fileWatcher = new FileSystemWatcher(_musicDirectoryPath)
+            _fileWatcher = new FileSystemWatcher(MusicDirectoryPath)
             {
                 Filter = "*.mp3",
                 IncludeSubdirectories = true,
@@ -157,11 +162,11 @@ public class TrackStoreService : IDisposable
             _fileWatcher.Renamed += OnFileRenamed;
             _fileWatcher.EnableRaisingEvents = true;
 
-            LoggingService.Info($"File watcher started for: {_musicDirectoryPath}");
+            _logger.Info($"File watcher started for: {MusicDirectoryPath}");
         }
         catch (Exception ex)
         {
-            LoggingService.Error("Failed to start file watcher", ex);
+            _logger.Error("Failed to start file watcher", ex);
         }
     }
 
@@ -175,7 +180,7 @@ public class TrackStoreService : IDisposable
             _fileWatcher.Renamed -= OnFileRenamed;
             _fileWatcher.Dispose();
             _fileWatcher = null;
-            LoggingService.Debug("File watcher stopped");
+            _logger.Debug("File watcher stopped");
         }
     }
 
@@ -193,7 +198,7 @@ public class TrackStoreService : IDisposable
             {
                 _tracks.Add(track);
                 TrackAdded?.Invoke(this, track);
-                LoggingService.Debug($"Track added via file watcher: {track.Artist} - {track.Title}");
+                _logger.Debug($"Track added via file watcher: {track.Artist} - {track.Title}");
             });
         }
     }
@@ -207,7 +212,7 @@ public class TrackStoreService : IDisposable
             {
                 _tracks.Remove(track);
                 TrackRemoved?.Invoke(this, track);
-                LoggingService.Debug($"Track removed via file watcher: {track.Artist} - {track.Title}");
+                _logger.Debug($"Track removed via file watcher: {track.Artist} - {track.Title}");
             });
         }
     }
@@ -232,7 +237,7 @@ public class TrackStoreService : IDisposable
             {
                 _tracks.Add(newTrack);
                 TrackAdded?.Invoke(this, newTrack);
-                LoggingService.Debug($"Track renamed via file watcher: {newTrack.Artist} - {newTrack.Title}");
+                _logger.Debug($"Track renamed via file watcher: {newTrack.Artist} - {newTrack.Title}");
             });
         }
     }
@@ -270,14 +275,7 @@ public class TrackStoreService : IDisposable
                 // Ignore duration read errors
             }
 
-            return new Track
-            {
-                Dance = dance,
-                Artist = artist,
-                Title = title,
-                FilePath = filePath,
-                Length = duration
-            };
+            return new Track(dance, artist, title, duration, filePath);
         }
         catch
         {
@@ -287,11 +285,21 @@ public class TrackStoreService : IDisposable
 
     public void Dispose()
     {
-        if (_disposed)
-            return;
-
-        StopFileWatcher();
-        _disposed = true;
+        Dispose(true);
         GC.SuppressFinalize(this);
+    }
+
+    private void Dispose(bool disposing)
+    {
+        if (_disposed) return;
+        _disposed = true;
+
+        if (disposing)
+        {
+            StopFileWatcher();
+            TrackAdded = null;
+            TrackRemoved = null;
+            TracksReloaded = null;
+        }
     }
 }

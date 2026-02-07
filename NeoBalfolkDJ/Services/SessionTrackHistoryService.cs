@@ -13,11 +13,13 @@ namespace NeoBalfolkDJ.Services;
 /// Tracks which songs have been played in the current session.
 /// Used to prevent duplicate tracks when the setting is enabled.
 /// </summary>
-public class SessionTrackHistoryService
+public sealed class SessionTrackHistoryService : ISessionTrackHistoryService, IDisposable
 {
+    private readonly ILoggingService _logger;
     private readonly HashSet<string> _playedTrackPaths = new();
     private readonly ObservableCollection<Track> _playedTracks = new();
-    
+    private bool _disposed;
+
     /// <summary>
     /// Observable collection of played tracks for UI binding
     /// </summary>
@@ -28,19 +30,22 @@ public class SessionTrackHistoryService
     /// </summary>
     public event EventHandler? HistoryChanged;
 
-    public SessionTrackHistoryService()
+    public SessionTrackHistoryService(ILoggingService logger)
     {
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         PlayedTracks = new ReadOnlyObservableCollection<Track>(_playedTracks);
     }
-    
+
     /// <summary>
     /// Records a track as having been played in this session.
     /// </summary>
     public void AddPlayedTrack(Track track)
     {
+        if (_disposed) return;
+
         _playedTrackPaths.Add(track.FilePath);
         _playedTracks.Add(track);
-        LoggingService.Debug($"Track added to session history: {track.Artist} - {track.Title}");
+        _logger.Debug($"Track added to session history: {track.Artist} - {track.Title}");
         HistoryChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -57,10 +62,12 @@ public class SessionTrackHistoryService
     /// </summary>
     public void Clear()
     {
+        if (_disposed) return;
+
         var count = _playedTrackPaths.Count;
         _playedTrackPaths.Clear();
         _playedTracks.Clear();
-        LoggingService.Debug($"Session track history cleared: {count} tracks removed");
+        _logger.Debug($"Session track history cleared: {count} tracks removed");
         HistoryChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -72,7 +79,7 @@ public class SessionTrackHistoryService
     /// <summary>
     /// Gets the total duration of all played tracks
     /// </summary>
-    public TimeSpan TotalDuration => TimeSpan.FromTicks(_playedTracks.Sum(t => t.Length.Ticks));
+    private TimeSpan TotalDuration => TimeSpan.FromTicks(_playedTracks.Sum(t => t.Length.Ticks));
 
     /// <summary>
     /// Gets the total duration formatted as string
@@ -93,8 +100,10 @@ public class SessionTrackHistoryService
     /// <summary>
     /// Exports the history to a JSON file
     /// </summary>
-    public async Task ExportToJsonAsync(string filePath)
+    public async Task ExportToFileAsync(string filePath)
     {
+        if (_disposed) return;
+
         var exportData = new
         {
             tracks = _playedTracks.Select(t => new
@@ -113,6 +122,14 @@ public class SessionTrackHistoryService
         });
 
         await File.WriteAllTextAsync(filePath, json);
-        LoggingService.Info($"History exported to: {filePath}");
+        _logger.Info($"History exported to: {filePath}");
+    }
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+
+        HistoryChanged = null;
     }
 }
